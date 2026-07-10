@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="88" align="right" alt="Voica icon" />
+
 # Voica for Windows
 
 **Dictation → punctuated text, via Groq Whisper.** Press a hotkey, speak, and Voica inserts

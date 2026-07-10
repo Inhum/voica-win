@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-07-10
 
 ### Added
 - First Windows implementation of Voica (C# / .NET 8 / WPF), tracking the cross‑platform
@@ -24,4 +24,4 @@ All notable changes to this project are documented here. The format is based on
 - English/Russian localization by system language.
 - `--test-all` self‑test (no GUI/network) and a `windows-latest` CI workflow.
 
-[Unreleased]: https://github.com/Inhum/voica-win/commits/main
+[0.1.0]: https://github.com/Inhum/voica-win/releases/tag/v0.1.0

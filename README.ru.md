@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="88" align="right" alt="Voica icon" />
+
 # Voica для Windows
 
 **Диктовка → текст с пунктуацией через Groq Whisper.** Нажми хоткей, говори — Voica вставит
