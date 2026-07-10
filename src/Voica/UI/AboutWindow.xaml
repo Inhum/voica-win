@@ -7,7 +7,8 @@
         ShowInTaskbar="False">
     <StackPanel Margin="20">
         <StackPanel Orientation="Horizontal">
-            <Image Source="pack://application:,,,/Resources/voica.ico" Width="48" Height="48" VerticalAlignment="Center" />
+            <Image Source="pack://application:,,,/Resources/voica-app.png" Width="48" Height="48" VerticalAlignment="Center"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
             <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="Voica" FontSize="22" FontWeight="Bold" />
                 <TextBlock x:Name="VersionText" Opacity="0.75" />

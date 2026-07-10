@@ -45,6 +45,7 @@
 
   <ItemGroup>
     <Resource Include="Resources\voica.ico" />
+    <Resource Include="Resources\voica-app.png" />
     <Resource Include="Resources\tray-idle.ico" />
     <Resource Include="Resources\tray-recording.ico" />
     <Resource Include="Resources\tray-recording-dim.ico" />

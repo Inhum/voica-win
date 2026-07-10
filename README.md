@@ -30,6 +30,20 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
   (optional update checks). Your API key is stored **encrypted with Windows DPAPI**.
 - **English & Russian** UI, by system language.
 
+## Screenshots
+
+**Settings** — the whole app in one window:
+
+<img src="docs/settings.png" width="480" alt="Settings window" />
+
+**History** — browse, re‑copy, play, delete:
+
+<img src="docs/history.png" width="560" alt="History window" />
+
+**About**:
+
+<img src="docs/about.png" width="380" alt="About window" />
+
 ## Requirements
 
 - Windows 10 version 1809 (build 17763) or later, x64.
