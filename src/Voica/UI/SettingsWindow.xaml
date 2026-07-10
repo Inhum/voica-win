@@ -1,0 +1,96 @@
+<Window x:Class="Voica.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Voica"
+        Title="{x:Static l:S.SettingsTitle}" Width="540" SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- 0 mode -->
+            <RowDefinition Height="Auto" /> <!-- 1 hotkey -->
+            <RowDefinition Height="Auto" /> <!-- 2 hotkey hint -->
+            <RowDefinition Height="Auto" /> <!-- 3 output -->
+            <RowDefinition Height="Auto" /> <!-- 4 toggles -->
+            <RowDefinition Height="Auto" /> <!-- 5 retention -->
+            <RowDefinition Height="Auto" /> <!-- 6 vocab -->
+            <RowDefinition Height="Auto" /> <!-- 7 vocab hint -->
+            <RowDefinition Height="Auto" /> <!-- 8 key label + box -->
+            <RowDefinition Height="Auto" /> <!-- 9 key buttons -->
+            <RowDefinition Height="Auto" /> <!-- 10 key status -->
+            <RowDefinition Height="Auto" /> <!-- 11 separator -->
+            <RowDefinition Height="Auto" /> <!-- 12 bottom actions -->
+        </Grid.RowDefinitions>
+
+        <!-- Dictation mode -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static l:S.LblDictationMode}" VerticalAlignment="Center" Margin="0,6,12,6" />
+        <ComboBox x:Name="ModeCombo" Grid.Row="0" Grid.Column="1" Margin="0,6" SelectionChanged="OnModeChanged" />
+
+        <!-- Hotkey -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static l:S.LblHotkey}" VerticalAlignment="Center" Margin="0,6,12,6" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+            <ComboBox x:Name="KeyCombo" Width="200" SelectionChanged="OnKeyChanged" />
+            <Button x:Name="CustomKeyButton" Content="{x:Static l:S.BtnCustom}" Width="86" Height="26" Margin="8,0,0,0" Click="OnCustomKey" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,6">
+            <TextBlock x:Name="CurrentHotkeyText" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.HotkeyHint}" />
+        </StackPanel>
+
+        <!-- Output -->
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static l:S.LblOutput}" VerticalAlignment="Center" Margin="0,6,12,6" />
+        <ComboBox x:Name="OutputCombo" Grid.Row="3" Grid.Column="1" Margin="0,6" SelectionChanged="OnOutputChanged" />
+
+        <!-- Toggles -->
+        <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,6">
+            <CheckBox x:Name="StoreAudioCheck" Content="{x:Static l:S.ChkStoreAudio}" Margin="0,2"
+                      Checked="OnStoreAudioChanged" Unchecked="OnStoreAudioChanged" />
+            <CheckBox x:Name="NotifyInsertCheck" Content="{x:Static l:S.ChkNotify}" Margin="0,2"
+                      Checked="OnNotifyInsertChanged" Unchecked="OnNotifyInsertChanged" />
+            <CheckBox x:Name="CheckUpdatesCheck" Content="{x:Static l:S.ChkCheckUpdates}" Margin="0,2"
+                      Checked="OnCheckUpdatesChanged" Unchecked="OnCheckUpdatesChanged" />
+        </StackPanel>
+
+        <!-- Retention -->
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="{x:Static l:S.LblRetention}" VerticalAlignment="Center" Margin="0,6,12,6" />
+        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
+            <TextBox x:Name="RetentionBox" Width="60" LostFocus="OnRetentionChanged" />
+            <TextBlock Text="{x:Static l:S.RetentionSuffix}" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
+        </StackPanel>
+
+        <!-- Vocabulary -->
+        <TextBlock Grid.Row="6" Grid.Column="0" Text="{x:Static l:S.LblVocabulary}" VerticalAlignment="Top" Margin="0,8,12,6" />
+        <TextBox x:Name="VocabularyBox" Grid.Row="6" Grid.Column="1" Margin="0,6"
+                 Height="72" AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" LostFocus="OnVocabularyChanged" />
+        <TextBlock Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Opacity="0.7" TextWrapping="Wrap"
+                   Text="{x:Static l:S.VocabHint}" />
+
+        <!-- API key -->
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="{x:Static l:S.LblApiKey}" VerticalAlignment="Center" Margin="0,10,12,6" />
+        <Grid Grid.Row="8" Grid.Column="1" Margin="0,10,0,4">
+            <PasswordBox x:Name="KeyBox" Height="26" VerticalContentAlignment="Center" />
+            <TextBox x:Name="KeyBoxVisible" Height="26" VerticalContentAlignment="Center" Visibility="Collapsed" />
+        </Grid>
+        <StackPanel Grid.Row="9" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
+            <CheckBox x:Name="ShowKeyCheck" Content="{x:Static l:S.ChkShow}" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Checked="OnToggleShowKey" Unchecked="OnToggleShowKey" />
+            <Button x:Name="ValidateButton" Content="{x:Static l:S.BtnValidate}" Width="84" Height="26" Margin="0,0,8,0" Click="OnValidateKey" />
+            <Button x:Name="SaveKeyButton" Content="{x:Static l:S.BtnSave}" Width="76" Height="26" Click="OnSaveKey" />
+        </StackPanel>
+        <TextBlock x:Name="KeyStatusText" Grid.Row="10" Grid.Column="1" Margin="0,0,0,6" Opacity="0.8" TextWrapping="Wrap" />
+
+        <Separator Grid.Row="11" Grid.ColumnSpan="2" Margin="0,10" />
+
+        <!-- Bottom actions -->
+        <Grid Grid.Row="12" Grid.ColumnSpan="2">
+            <Button Content="{x:Static l:S.BtnDeleteAll}" HorizontalAlignment="Left" Width="150" Height="28"
+                    Foreground="#C0392B" Click="OnDeleteAllData" />
+            <Button Content="{x:Static l:S.BtnClose}" HorizontalAlignment="Right" Width="90" Height="28" IsCancel="True" Click="OnClose" />
+        </Grid>
+    </Grid>
+</Window>

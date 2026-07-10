@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+
+# Rider / VS
+.vs/
+.idea/
+*.suo
+
+# Local secrets / env (never commit the Groq key)
+*.env
+.env
+secrets.*
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Claude local settings
+.claude/settings.local.json

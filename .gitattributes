@@ -1,0 +1,8 @@
+# Normalize line endings: text files stored as LF in the repo, checked out native.
+* text=auto
+
+# Binary assets — never touch.
+*.ico binary
+*.png binary
+*.wav binary
+*.dmg binary

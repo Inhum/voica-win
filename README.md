@@ -1,0 +1,105 @@
+# Voica for Windows
+
+**Dictation → punctuated text, via Groq Whisper.** Press a hotkey, speak, and Voica inserts
+clean, punctuated text into whatever field you're typing in. Bring your own Groq API key.
+
+[Русская версия](README.ru.md)
+
+Voica is a tiny background app that lives in the system tray. It's a native Windows
+(C# / .NET 8 / WPF) implementation of [Voica](https://github.com/Inhum/voica) (macOS), and follows
+the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
+
+## Features
+
+- **Global hotkey dictation** — Push‑to‑talk (hold) or Toggle (press to start/stop). Default:
+  **Toggle + Right Alt**. Pick a preset key (Right/Left Alt, CapsLock, ScrollLock, Pause) or record
+  a **custom combination** (e.g. `Ctrl+Shift+Space`).
+- **Punctuation via Groq Whisper** (`whisper-large-v3-turbo`) — auto language detection (great for
+  mixed Russian/English).
+- **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
+  the clipboard as a fallback. Or show an editable **result window**.
+- **History** (SQLite) — browse, re‑copy, play the audio, delete.
+- **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
+  audio at all.
+- **Vocabulary** — a hint list of terms/names Whisper often mangles.
+- **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
+  or installs anything itself — it just opens the release page.
+- **Privacy** — no backend, no telemetry. Network is used only for Groq (transcription) and GitHub
+  (optional update checks). Your API key is stored **encrypted with Windows DPAPI**.
+- **English & Russian** UI, by system language.
+
+## Requirements
+
+- Windows 10 version 1809 (build 17763) or later, x64.
+- A **Groq API key** — create one at <https://console.groq.com>. Voica uses the free tier's
+  `whisper-large-v3-turbo`.
+
+## Install
+
+1. Download `Voica.exe` from the [latest release](https://github.com/Inhum/voica-win/releases/latest).
+2. Run it. It's a single self‑contained file — no installer, no .NET required.
+   - The build is **not code‑signed yet**, so SmartScreen may warn ("Windows protected your PC").
+     Click **More info → Run anyway**. (Signing via SignPath is planned.)
+3. Voica appears in the system tray (no main window).
+
+## First run
+
+On first launch (with no key set) the **Settings** window opens. Paste your Groq API key, click
+**Validate**, then **Save** (it's encrypted with DPAPI). You can also set the key via the
+`GROQ_API_KEY` environment variable for development.
+
+## Usage
+
+- **Dictate:** press **Right Alt** (default), speak, press **Right Alt** again to stop (Toggle
+  mode). In PTT mode, hold to talk and release to send.
+- The recognized text is inserted into the focused field and copied to the clipboard.
+- Right‑click the tray icon for **Settings**, **History**, **Check for Updates**, and **About**.
+
+The tray icon reflects state: idle (blue), recording (pulsing red), transcribing (amber).
+
+## Settings
+
+| Setting | Notes |
+|---|---|
+| Dictation mode | PTT (hold) or Toggle |
+| Hotkey | Preset single key or a custom combination |
+| Output | Insert into field, or show a result window |
+| Store audio recordings | On by default |
+| Show a notification after inserting | The tray balloon; can be turned off |
+| Check for updates on launch | Once a day, opt‑in |
+| Delete audio older than | N days; 0 = keep forever |
+| Vocabulary | Terms/names hint (last 800 chars used) |
+| Groq API key | Validate + Save (DPAPI); **Show** to reveal |
+| Delete all data… | Wipes history, audio, key, settings (random‑phrase confirmation) |
+
+## Data locations
+
+Everything lives outside the executable in `%APPDATA%\Voica\`, so it survives updates:
+
+- `history.sqlite` — transcription history
+- `audio\*.wav` — stored recordings (16 kHz mono PCM)
+- `credentials.dat` — DPAPI‑encrypted Groq key
+- `settings.json` — settings
+- `voica.log` — local diagnostic log
+
+## Build from source
+
+Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download).
+
+```powershell
+# Build
+dotnet build Voica.sln -c Debug
+
+# Self-test (no GUI/network) — exit code 0 on success
+Start-Process -FilePath "src\Voica\bin\Debug\net8.0-windows10.0.17763.0\Voica.exe" `
+  -ArgumentList "--test-all" -Wait -PassThru -NoNewWindow
+
+# Single-file self-contained release
+dotnet publish src\Voica\Voica.csproj -c Release -p:PublishSingleFile=true
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture notes and the self‑test conventions.
+
+## License
+
+[MIT](LICENSE) © Ivan Ushakov.

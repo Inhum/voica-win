@@ -1,0 +1,17 @@
+<Window x:Class="Voica.UI.HotkeyCaptureDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Voica"
+        Title="{x:Static l:S.CaptureTitle}" Width="400" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" Focusable="True">
+    <StackPanel Margin="16">
+        <TextBlock TextWrapping="Wrap" Text="{x:Static l:S.CaptureInstr}" />
+        <Border Margin="0,14" Padding="10" CornerRadius="4" Background="#20808080">
+            <TextBlock x:Name="PreviewText" FontSize="18" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" Text="…" />
+        </Border>
+        <TextBlock x:Name="HintText" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,10" />
+        <Button Content="{x:Static l:S.BtnCancel}" Width="90" Height="28" HorizontalAlignment="Right" IsCancel="True" />
+    </StackPanel>
+</Window>

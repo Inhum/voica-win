@@ -1,0 +1,27 @@
+<Window x:Class="Voica.UI.ResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Voica"
+        Title="Voica" Width="480" Height="320"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBox x:Name="TextArea"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 FontSize="14" />
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="CopyButton" Content="{x:Static l:S.BtnCopy}" Width="90" Height="28"
+                    Margin="0,0,8,0" Click="OnCopy" />
+            <Button Content="{x:Static l:S.BtnClose}" Width="90" Height="28" IsCancel="True" Click="OnClose" />
+        </StackPanel>
+    </Grid>
+</Window>

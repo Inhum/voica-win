@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build Voica.sln -c Release
+
+      - name: Self-test (--test-all)
+        shell: pwsh
+        run: |
+          $exe = "src/Voica/bin/Release/net8.0-windows10.0.17763.0/Voica.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--test-all" -Wait -PassThru -NoNewWindow
+          Write-Host "Self-test exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }

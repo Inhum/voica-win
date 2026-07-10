@@ -1,0 +1,31 @@
+<Window x:Class="Voica.UI.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Voica"
+        Title="{x:Static l:S.AboutTitle}" Width="380" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False">
+    <StackPanel Margin="20">
+        <StackPanel Orientation="Horizontal">
+            <Image Source="pack://application:,,,/Resources/voica.ico" Width="48" Height="48" VerticalAlignment="Center" />
+            <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Voica" FontSize="22" FontWeight="Bold" />
+                <TextBlock x:Name="VersionText" Opacity="0.75" />
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" Text="{x:Static l:S.AboutTagline}" />
+
+        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Opacity="0.8" Text="{x:Static l:S.AboutPrivacy}" />
+
+        <TextBlock Margin="0,14,0,0">
+            <Hyperlink x:Name="RepoLink" RequestNavigate="OnNavigate"
+                       NavigateUri="https://github.com/Inhum/voica-win">
+                github.com/Inhum/voica-win
+            </Hyperlink>
+        </TextBlock>
+
+        <Button Content="{x:Static l:S.BtnClose}" Width="90" Height="28" Margin="0,20,0,0"
+                HorizontalAlignment="Right" IsCancel="True" Click="OnClose" />
+    </StackPanel>
+</Window>

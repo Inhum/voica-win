@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Target Windows 10 1809 (build 17763) as the minimum supported OS. -->
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Voica</RootNamespace>
+    <AssemblyName>Voica</AssemblyName>
+    <!-- Custom entry point (Program.Main) so the self-test flag runs without any WPF/GUI init. -->
+    <StartupObject>Voica.Program</StartupObject>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\voica.ico</ApplicationIcon>
+
+    <!-- Version: single source of truth (spec §12). -->
+    <Version>0.1.0</Version>
+    <Product>Voica</Product>
+    <Company>Inhum</Company>
+    <Authors>Ivan Ushakov</Authors>
+    <Description>Dictation to punctuated text via Groq Whisper (Windows).</Description>
+    <Copyright>Copyright (c) 2026 Ivan Ushakov</Copyright>
+
+    <!-- Publish defaults (overridable on the CLI in Phase 6). -->
+    <RuntimeIdentifier Condition="'$(PublishSingleFile)' == 'true'">win-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(PublishSingleFile)' == 'true'">true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Compile App.xaml as a Page (not ApplicationDefinition) so the SDK does not
+       generate its own Main(); our Program.Main is the entry point. -->
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\voica.ico" />
+    <Resource Include="Resources\tray-idle.ico" />
+    <Resource Include="Resources\tray-recording.ico" />
+    <Resource Include="Resources\tray-recording-dim.ico" />
+    <Resource Include="Resources\tray-transcribing.ico" />
+  </ItemGroup>
+
+</Project>
