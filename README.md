@@ -34,15 +34,17 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
 
 **Settings** — the whole app in one window:
 
-<img src="docs/settings.png" width="480" alt="Settings window" />
+![Settings window](docs/settings.png)
 
 **History** — browse, re‑copy, play, delete:
 
-<img src="docs/history.png" width="560" alt="History window" />
+![History window](docs/history.png)
 
-**About**:
+**About**, and the tray icon (idle):
 
-<img src="docs/about.png" width="380" alt="About window" />
+![About window](docs/about.png)
+
+![Tray icon](docs/tray.png)
 
 ## Requirements
 
