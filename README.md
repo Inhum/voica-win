@@ -1,11 +1,27 @@
-<img src="docs/icon.png" width="88" align="right" alt="Voica icon" />
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="Voica icon">
+</p>
 
-# Voica for Windows
+<h1 align="center">Voica for Windows</h1>
 
-**Dictation → punctuated text, via Groq Whisper.** Press a hotkey, speak, and Voica inserts
-clean, punctuated text into whatever field you're typing in. Bring your own Groq API key.
+<p align="center">
+  A Windows tray app for voice dictation <b>with punctuation</b>, powered by Groq Whisper.
+</p>
 
-[Русская версия](README.ru.md)
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4" alt="Windows 10 1809+">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
+  <img src="https://img.shields.io/badge/built%20with-C%23%20%2F%20.NET%208-512BD4" alt="C# / .NET 8">
+</p>
+
+<p align="center">
+  English · <a href="README.ru.md">Русский</a>
+</p>
+
+---
+
+Press a hotkey, speak, and Voica inserts clean, punctuated text into whatever field you're
+typing in. Bring your own Groq API key.
 
 Voica is a tiny background app that lives in the system tray. It's a native Windows
 (C# / .NET 8 / WPF) implementation of [Voica](https://github.com/Inhum/voica) (macOS), and follows

@@ -1,11 +1,27 @@
-<img src="docs/icon.png" width="88" align="right" alt="Voica icon" />
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="Иконка Voica">
+</p>
 
-# Voica для Windows
+<h1 align="center">Voica для Windows</h1>
 
-**Диктовка → текст с пунктуацией через Groq Whisper.** Нажми хоткей, говори — Voica вставит
-аккуратный текст с пунктуацией прямо в активное поле. Ключ Groq — свой (BYO‑key).
+<p align="center">
+  Диктовка <b>с пунктуацией</b> для Windows — фоновое приложение в трее на базе Groq Whisper.
+</p>
 
-[English version](README.md)
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4" alt="Windows 10 1809+">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="Лицензия MIT">
+  <img src="https://img.shields.io/badge/built%20with-C%23%20%2F%20.NET%208-512BD4" alt="C# / .NET 8">
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> · Русский
+</p>
+
+---
+
+Нажми хоткей, говори — Voica вставит аккуратный текст с пунктуацией прямо в активное поле.
+Ключ Groq — свой (BYO‑key).
 
 Voica — маленькое фоновое приложение в системном трее. Это нативная реализация под Windows
 (C# / .NET 8 / WPF) приложения [Voica](https://github.com/Inhum/voica) (macOS); поведение задаёт

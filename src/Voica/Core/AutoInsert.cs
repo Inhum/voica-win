@@ -40,9 +40,16 @@ public static class AutoInsert
         }
     }
 
-    /// <summary>Synthesizes a Ctrl+V key chord into whatever window currently has focus.</summary>
+    /// <summary>
+    /// Synthesizes a Ctrl+V key chord into whatever window currently has focus.
+    /// First waits (briefly) until the user's physical modifiers are released: an injected Ctrl
+    /// combined with a physically held Shift/Alt would form Ctrl+Shift / Alt+Shift — the system
+    /// keyboard-layout switch chords — randomly flipping the input language mid-insert.
+    /// </summary>
     public static void SendCtrlV()
     {
+        WaitForModifiersReleased();
+
         var inputs = new[]
         {
             KeyDown(VK_CONTROL),
@@ -55,6 +62,24 @@ public static class AutoInsert
             Log.Error($"SendInput injected {sent}/{inputs.Length} events (win32 error {Marshal.GetLastWin32Error()})");
     }
 
+    /// <summary>Polls until Ctrl/Alt/Shift/Win are all physically up, or ~1 s passes.</summary>
+    private static void WaitForModifiersReleased()
+    {
+        const int timeoutMs = 1000;
+        const int pollMs = 15;
+        for (int waited = 0; waited < timeoutMs; waited += pollMs)
+        {
+            if (!AnyModifierDown()) return;
+            Thread.Sleep(pollMs);
+        }
+        Log.Info("insert: modifiers still held after 1 s — injecting anyway");
+    }
+
+    private static bool AnyModifierDown() =>
+        IsDown(VK_CONTROL) || IsDown(VK_MENU) || IsDown(VK_SHIFT) || IsDown(VK_LWIN) || IsDown(VK_RWIN);
+
+    private static bool IsDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
     /// <summary>Marshalled size of the native INPUT struct (must be 40 on x64, 28 on x86).</summary>
     internal static int NativeInputSize => Marshal.SizeOf<INPUT>();
 
@@ -64,13 +89,27 @@ public static class AutoInsert
     private static INPUT MakeKey(ushort vk, uint flags) => new()
     {
         type = INPUT_KEYBOARD,
-        U = new InputUnion { ki = new KEYBDINPUT { wVk = vk, dwFlags = flags } },
+        U = new InputUnion
+        {
+            // Include the scan code: layout switchers/IMEs mishandle injected keys with wScan=0.
+            ki = new KEYBDINPUT
+            {
+                wVk = vk,
+                wScan = (ushort)MapVirtualKey(vk, MAPVK_VK_TO_VSC),
+                dwFlags = flags,
+            },
+        },
     };
 
     // --- Win32 ---
 
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint MAPVK_VK_TO_VSC = 0;
+    private const int VK_SHIFT = 0x10;
+    private const int VK_MENU = 0x12;   // Alt
+    private const int VK_LWIN = 0x5B;
+    private const int VK_RWIN = 0x5C;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
@@ -121,4 +160,10 @@ public static class AutoInsert
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 }

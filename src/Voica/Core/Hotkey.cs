@@ -33,9 +33,11 @@ public sealed class HotkeyManager : IDisposable
     private const int WM_KEYUP = 0x0101;
     private const int WM_SYSKEYDOWN = 0x0104;
     private const int WM_SYSKEYUP = 0x0105;
+    private const uint LLKHF_INJECTED = 0x10;   // KBDLLHOOKSTRUCT.flags: event came from SendInput
 
     private readonly LowLevelKeyboardProc _proc;   // kept alive to prevent GC of the callback
     private IntPtr _hook = IntPtr.Zero;
+    private System.Windows.Threading.Dispatcher? _dispatcher;
 
     private bool _isDown;         // logical: recording (PTT) / toggle armed
     private bool _engagedMain;    // combo: the current main-key press is being intercepted
@@ -51,6 +53,7 @@ public sealed class HotkeyManager : IDisposable
     public void Start()
     {
         if (_hook != IntPtr.Zero) return;
+        _dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
         using var process = Process.GetCurrentProcess();
         using var module = process.MainModule!;
         _hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(module.ModuleName), 0);
@@ -71,7 +74,14 @@ public sealed class HotkeyManager : IDisposable
     {
         if (nCode >= 0)
         {
-            int vk = Marshal.ReadInt32(lParam);   // KBDLLHOOKSTRUCT.vkCode is the first field
+            int vk = Marshal.ReadInt32(lParam);                    // KBDLLHOOKSTRUCT.vkCode
+            uint flags = (uint)Marshal.ReadInt32(lParam, 8);       // KBDLLHOOKSTRUCT.flags
+
+            // Ignore injected input (e.g. our own synthesized Ctrl+V): it must neither update the
+            // modifier tracking nor be able to trigger/satisfy the hotkey.
+            if ((flags & LLKHF_INJECTED) != 0)
+                return CallNextHookEx(_hook, nCode, wParam, lParam);
+
             int msg = wParam.ToInt32();
             bool down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
             bool up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
@@ -114,16 +124,20 @@ public sealed class HotkeyManager : IDisposable
 
     private void HandlePress(bool down, bool up)
     {
+        // Dispatch asynchronously: subscriber work (e.g. opening the mic) must not run inside the
+        // low-level hook callback — a callback slower than the system's LowLevelHooksTimeout
+        // (~300 ms) gets the hook silently removed, and it stalls keyboard input system-wide.
         if (down && !_isDown)
         {
             _isDown = true;
-            if (Mode == DictationMode.Ptt) Started?.Invoke();
-            else Toggled?.Invoke();
+            var handler = Mode == DictationMode.Ptt ? Started : Toggled;
+            if (handler is not null) _dispatcher?.BeginInvoke(handler);
         }
         else if (up && _isDown)
         {
             _isDown = false;
-            if (Mode == DictationMode.Ptt) Stopped?.Invoke();
+            if (Mode == DictationMode.Ptt && Stopped is { } stopped)
+                _dispatcher?.BeginInvoke(stopped);
         }
     }
 
