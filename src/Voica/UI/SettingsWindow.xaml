@@ -66,9 +66,16 @@
         <TextBlock Grid.Row="6" Grid.Column="0" Text="{x:Static l:S.LblVocabulary}" VerticalAlignment="Top" Margin="0,8,12,6" />
         <TextBox x:Name="VocabularyBox" Grid.Row="6" Grid.Column="1" Margin="0,6"
                  Height="72" AcceptsReturn="True" TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto" LostFocus="OnVocabularyChanged" />
-        <TextBlock Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Opacity="0.7" TextWrapping="Wrap"
-                   Text="{x:Static l:S.VocabHint}" />
+                 VerticalScrollBarVisibility="Auto"
+                 TextChanged="OnVocabularyTextChanged" LostFocus="OnVocabularyChanged" />
+        <StackPanel Grid.Row="7" Grid.Column="1" Margin="0,0,0,8">
+            <TextBlock x:Name="VocabCounter" HorizontalAlignment="Right" Opacity="0.7" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.VocabHint}" />
+            <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" Margin="0,8,0,2"
+                      Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
+            <TextBlock x:Name="LlmStatusText" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,0,2" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.LlmHint}" />
+        </StackPanel>
 
         <!-- API key -->
         <TextBlock Grid.Row="8" Grid.Column="0" Text="{x:Static l:S.LblApiKey}" VerticalAlignment="Center" Margin="0,10,12,6" />
@@ -88,8 +95,12 @@
 
         <!-- Bottom actions -->
         <Grid Grid.Row="12" Grid.ColumnSpan="2">
-            <Button Content="{x:Static l:S.BtnDeleteAll}" HorizontalAlignment="Left" Width="150" Height="28"
-                    Foreground="#C0392B" Click="OnDeleteAllData" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Content="{x:Static l:S.BtnDeleteAll}" Width="150" Height="28"
+                        Foreground="#C0392B" Click="OnDeleteAllData" />
+                <Button Content="{x:Static l:S.BtnResetSettings}" Width="150" Height="28"
+                        Margin="8,0,0,0" Click="OnResetSettings" />
+            </StackPanel>
             <Button Content="{x:Static l:S.BtnClose}" HorizontalAlignment="Right" Width="90" Height="28" IsCancel="True" Click="OnClose" />
         </Grid>
     </Grid>

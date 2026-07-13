@@ -29,13 +29,17 @@ public sealed class GroqException : Exception
 public static class GroqClient
 {
     public const string Model = "whisper-large-v3-turbo";
+    public const string PostProcessModel = "qwen/qwen3-32b";   // spec §6.1
     public const int PromptCharBudget = 800;
 
     public static readonly Uri Endpoint = new("https://api.groq.com/openai/v1/audio/transcriptions");
     public static readonly Uri ModelsEndpoint = new("https://api.groq.com/openai/v1/models");
+    public static readonly Uri ChatEndpoint = new("https://api.groq.com/openai/v1/chat/completions");
 
     private static readonly TimeSpan TranscribeTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan ValidateTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan PostProcessTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ChatProbeTimeout = TimeSpan.FromSeconds(15);
 
     // Shared client with no built-in timeout; each call applies its own via a CancellationToken.
     private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
@@ -114,6 +118,114 @@ public static class GroqClient
         {
             throw new GroqException(S.GroqParse);
         }
+    }
+
+    // --- LLM post-processing: fix mangled vocabulary terms (spec §6.1) ---
+
+    /// <summary>
+    /// Builds the correction prompt (spec §6.1). Null when the vocabulary is empty — post-processing
+    /// is skipped entirely. The wording mirrors the reference `GroqClient.postProcessPrompt` verbatim
+    /// (it is the semantic contract and is intentionally Russian on all locales, as in macOS).
+    /// </summary>
+    public static string? PostProcessPromptText(string text, string? vocabulary)
+    {
+        var vocab = (vocabulary ?? string.Empty).Trim();
+        if (vocab.Length == 0) return null;
+        return
+            "Ты — корректор диктовки. Ниже словарь терминов пользователя и распознанный текст. " +
+            "В тексте могут встречаться искажённые варианты этих терминов (речь распознавалась на слух). " +
+            "Верни ТОЛЬКО исправленный текст: замени искажённые варианты на правильные написания из словаря, " +
+            "согласуя с падежом и контекстом. Если под искажение подходят несколько терминов словаря — " +
+            "выбирай наиболее близкий по ЗВУЧАНИЮ к тому, что записано (например, «кубер стил» звучит как " +
+            "kubectl, а не Kubernetes). Если слово в тексте уже совпадает со словарным термином " +
+            "(пусть и в другом регистре, например с заглавной буквы) — оно правильное: не трогай его " +
+            "и не меняй его регистр. Больше ничего не меняй — ни слова, ни пунктуацию. " +
+            "Если исправлять нечего — верни текст как есть.\n\n" +
+            $"СЛОВАРЬ: {vocab}\n\n" +
+            $"ТЕКСТ: {text}";
+    }
+
+    /// <summary>
+    /// Corrects mangled vocabulary terms via the Groq chat model (spec §6.1). Fail-open: on any
+    /// error/timeout/non-2xx/empty answer the ORIGINAL text is returned — post-processing never
+    /// blocks dictation.
+    /// </summary>
+    public static async Task<string> PostProcessAsync(string text, string apiKey, string? vocabulary,
+        CancellationToken cancellationToken = default)
+    {
+        var prompt = PostProcessPromptText(text, vocabulary);
+        if (prompt is null) return text;
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(PostProcessTimeout);
+
+        try
+        {
+            using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
+            if (!response.IsSuccessStatusCode) return text;
+
+            var body = await response.Content.ReadAsStringAsync(cts.Token);
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+                return text;
+            var content = choices[0].GetProperty("message").GetProperty("content").GetString();
+            var cleaned = (content ?? string.Empty).Trim();
+            return cleaned.Length == 0 ? text : cleaned;
+        }
+        catch
+        {
+            return text;   // fail-open (spec §6.1)
+        }
+    }
+
+    /// <summary>
+    /// Probes the chat model's availability for AI correction (spec §6.1 UX). Null = available;
+    /// otherwise a user-facing description (403 → "allow the model in the Groq console" hint).
+    /// </summary>
+    public static async Task<string?> ValidateChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(ChatProbeTimeout);
+
+        try
+        {
+            using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            return (int)response.StatusCode switch
+            {
+                >= 200 and < 300 => null,
+                403 => string.Format(S.LlmBlockedFmt, PostProcessModel),
+                401 => S.KeyValidRejected,
+                var code => $"HTTP {code}",
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return S.KeyValidTimeout;
+        }
+        catch (HttpRequestException ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    private static HttpRequestMessage BuildChatRequest(string apiKey, string userContent, int maxCompletionTokens)
+    {
+        var payload = new
+        {
+            model = PostProcessModel,
+            temperature = 0,
+            reasoning_effort = "none",   // qwen3 is a thinking model; no reasoning needed here
+            max_completion_tokens = maxCompletionTokens,
+            messages = new[] { new { role = "user", content = userContent } },
+        };
+        var request = new HttpRequestMessage(HttpMethod.Post, ChatEndpoint)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        return request;
     }
 
     /// <summary>Validates a key against the models endpoint (spec §2): 200 → valid, 401 → rejected, else HTTP N.</summary>

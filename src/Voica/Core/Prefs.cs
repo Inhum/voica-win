@@ -33,6 +33,7 @@ public static class Prefs
         public bool CheckUpdatesOnLaunch { get; set; } = true;   // spec §10
         public long LastUpdateCheckUnix { get; set; } = 0;       // 0 = never
         public string Vocabulary { get; set; } = "";             // spec §6
+        public bool LlmPostProcess { get; set; } = false;        // spec §6.1, opt-in
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
     }
 
@@ -124,6 +125,13 @@ public static class Prefs
     {
         get { lock (Gate) return _data.Vocabulary; }
         set { lock (Gate) { _data.Vocabulary = value ?? ""; Save(); } }
+    }
+
+    /// <summary>Whether to fix vocabulary terms via the Groq LLM after transcription (spec §6.1, opt-in).</summary>
+    public static bool LlmPostProcess
+    {
+        get { lock (Gate) return _data.LlmPostProcess; }
+        set { lock (Gate) { _data.LlmPostProcess = value; Save(); } }
     }
 
     /// <summary>Whether to show the "Inserted" balloon after a successful insert.</summary>

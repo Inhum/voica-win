@@ -40,11 +40,18 @@ public partial class SettingsWindow : Window
         CheckUpdatesCheck.IsChecked = Prefs.CheckUpdatesOnLaunch;
         RetentionBox.Text = Prefs.RetentionDays.ToString();
         VocabularyBox.Text = Prefs.Vocabulary;
+        UpdateVocabCounter();
+        LlmCheck.IsChecked = Prefs.LlmPostProcess;
+        LlmStatusText.Text = "";
 
         // Prefill the saved key (masked) so "Show" can reveal it, like the macOS app.
         KeyBox.Password = KeyStore.Load() ?? "";
         RefreshKeyStatus();
         _loaded = true;
+
+        // Spec §6.1 UX: probe model availability when opening with the toggle already on.
+        if (Prefs.LlmPostProcess)
+            _ = ProbeChatModelAsync();
     }
 
     // --- Immediate-apply settings ---
@@ -126,6 +133,55 @@ public partial class SettingsWindow : Window
         Prefs.Vocabulary = VocabularyBox.Text;
     }
 
+    private void OnVocabularyTextChanged(object sender, RoutedEventArgs e) => UpdateVocabCounter();
+
+    /// <summary>Live counter "N / budget" (spec §11); warning color when over — only the tail is sent.</summary>
+    private void UpdateVocabCounter()
+    {
+        int len = VocabularyBox.Text.Trim().Length;
+        VocabCounter.Text = string.Format(S.VocabCounterFmt, len, GroqClient.PromptCharBudget);
+        VocabCounter.Foreground = len > GroqClient.PromptCharBudget
+            ? System.Windows.Media.Brushes.Firebrick
+            : System.Windows.SystemColors.GrayTextBrush;
+    }
+
+    // --- AI term correction (spec §6.1) ---
+
+    private void OnLlmChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.LlmPostProcess = LlmCheck.IsChecked == true;
+        LlmStatusText.Text = "";
+        if (Prefs.LlmPostProcess)
+            _ = ProbeChatModelAsync();
+    }
+
+    /// <summary>Non-blocking availability probe of the chat model (spec §6.1 UX).</summary>
+    private async System.Threading.Tasks.Task ProbeChatModelAsync()
+    {
+        var key = KeyStore.Load();
+        if (key is null)
+        {
+            LlmStatusText.Text = string.Format(S.LlmUnavailableFmt, S.KeyNone);
+            LlmStatusText.Foreground = System.Windows.Media.Brushes.Firebrick;
+            return;
+        }
+
+        LlmStatusText.Text = S.LlmChecking;
+        LlmStatusText.Foreground = System.Windows.SystemColors.GrayTextBrush;
+        var problem = await GroqClient.ValidateChatModelAsync(key);
+        if (problem is null)
+        {
+            LlmStatusText.Text = S.LlmAvailable;
+            LlmStatusText.Foreground = System.Windows.Media.Brushes.Green;
+        }
+        else
+        {
+            LlmStatusText.Text = string.Format(S.LlmUnavailableFmt, problem);
+            LlmStatusText.Foreground = System.Windows.Media.Brushes.Firebrick;
+        }
+    }
+
     // --- Groq API key (Save-gated) ---
 
     /// <summary>The key currently typed, from whichever box (masked / shown) is visible.</summary>
@@ -199,6 +255,23 @@ public partial class SettingsWindow : Window
         RefreshKeyStatus();
         KeyStatusText.Text = S.KeySavedNow;
         Log.Info("Groq key saved");
+    }
+
+    // --- Reset settings (spec §11): keeps key, history, audio, and vocabulary ---
+
+    private void OnResetSettings(object sender, RoutedEventArgs e)
+    {
+        var confirm = MessageBox.Show(S.ResetMsg, S.ResetTitle,
+            MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.OK) return;
+
+        var vocab = Prefs.Vocabulary;   // vocabulary is user content, not a setting
+        Prefs.Reset();
+        Prefs.Vocabulary = vocab;
+        _onHotkeyChanged();
+        LoadFromPrefs();
+        KeyStatusText.Text = S.ResetDone;
+        Log.Info("settings reset to defaults (key/history/audio/vocabulary kept)");
     }
 
     // --- Delete all data (spec §11) ---

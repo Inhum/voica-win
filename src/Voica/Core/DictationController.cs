@@ -129,11 +129,24 @@ public sealed class DictationController : IDisposable
 
             if (!string.IsNullOrWhiteSpace(result.Text))
             {
-                Deliver(result.Text);
+                var finalText = result.Text;
 
-                // Persist to history. Store honors "store audio" (spec §8) — it keeps or deletes
-                // the temp WAV (which already lives in AudioDir) and takes ownership of the file.
-                var id = Store.Shared.Insert(result.Text, result.Language, result.Duration,
+                // AI term correction (spec §6.1): opt-in, needs a non-empty vocabulary; fail-open.
+                // The state stays Transcribing while this runs (icon keeps showing work).
+                if (Prefs.LlmPostProcess)
+                {
+                    finalText = await GroqClient.PostProcessAsync(finalText, key, Prefs.Vocabulary);
+                    if (!ReferenceEquals(finalText, result.Text) && finalText != result.Text)
+                        Log.Info($"llm post-process: corrected ({result.Text.Length} → {finalText.Length} chars)");
+                    else
+                        Log.Info("llm post-process: no changes (or skipped/fail-open)");
+                }
+
+                Deliver(finalText);
+
+                // Persist the FINAL (corrected) text to history (spec §6.1). Store honors
+                // "store audio" (spec §8) — it keeps or deletes the temp WAV (already in AudioDir).
+                var id = Store.Shared.Insert(finalText, result.Language, result.Duration,
                     GroqClient.Model, recording.FilePath);
                 Log.Info($"saved to history id={id?.ToString() ?? "null"}");
             }

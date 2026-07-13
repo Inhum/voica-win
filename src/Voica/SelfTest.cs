@@ -54,6 +54,30 @@ public static class SelfTest
         Check("prompt keeps tail",
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
+        // --- LLM post-processing prompt (spec §6.1) ---
+        Check("postprocess model", GroqClient.PostProcessModel == "qwen/qwen3-32b");
+        Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
+        Check("postprocess prompt null on empty vocab",
+            GroqClient.PostProcessPromptText("текст", "  \n ") is null);
+        var ppPrompt = GroqClient.PostProcessPromptText("привет кубер стил", "kubectl, Kubernetes");
+        Check("postprocess prompt contains vocab and text",
+            ppPrompt is not null && ppPrompt.Contains("СЛОВАРЬ: kubectl, Kubernetes")
+            && ppPrompt.Contains("ТЕКСТ: привет кубер стил"));
+
+        var savedLlm = Prefs.LlmPostProcess;
+        Prefs.LlmPostProcess = !savedLlm;
+        Check("prefs llmPostProcess round-trip", Prefs.LlmPostProcess == !savedLlm);
+        Prefs.LlmPostProcess = savedLlm;
+
+        // --- Reset-settings semantics (spec §11): vocabulary is user content, survives reset ---
+        var rsVocab = Prefs.Vocabulary; var rsLlm = Prefs.LlmPostProcess; var rsDays = Prefs.RetentionDays;
+        Prefs.Vocabulary = "__voica_reset_test__"; Prefs.LlmPostProcess = true; Prefs.RetentionDays = 7;
+        var keepVocab = Prefs.Vocabulary;
+        Prefs.Reset(); Prefs.Vocabulary = keepVocab;   // the reset-settings flow
+        Check("reset-settings keeps vocabulary, resets the rest",
+            Prefs.Vocabulary == "__voica_reset_test__" && !Prefs.LlmPostProcess && Prefs.RetentionDays == 30);
+        Prefs.Vocabulary = rsVocab; Prefs.LlmPostProcess = rsLlm; Prefs.RetentionDays = rsDays;
+
         // --- Updater version comparison (spec §10) ---
         Check("update normalize v-prefix", Updater.Normalize("v0.5.0") == "0.5.0");
         Check("update isNewer patch", Updater.IsNewer("0.4.1", "0.4.0"));
@@ -124,7 +148,7 @@ public static class SelfTest
             Prefs.Mode == DictationMode.Toggle && Prefs.Hotkey == HotkeyBinding.Default
             && Prefs.Output == OutputMode.Insert && Prefs.RetentionDays == 30
             && Prefs.StoreAudio && Prefs.Vocabulary == "" && Prefs.CheckUpdatesOnLaunch
-            && Prefs.NotifyOnInsert);
+            && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess);
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;

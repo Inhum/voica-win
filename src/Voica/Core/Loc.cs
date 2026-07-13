@@ -83,6 +83,27 @@ public static class S
     public static string VocabHint => Loc.T(
         "Terms/names Whisper often gets wrong. A hint, not a hard replacement (kept to the last 800 characters).",
         "Слова/названия, которые Whisper часто коверкает. Подсказка, не жёсткая замена (учитываются последние 800 символов).");
+    public static string VocabCounterFmt => "{0} / {1}";
+
+    // AI term correction (spec §6.1)
+    public static string ChkLlm => Loc.T("AI term correction (Groq LLM)", "ИИ-исправление терминов (Groq LLM)");
+    public static string LlmHint => Loc.T(
+        "After transcription, mangled vocabulary terms are fixed by a Groq chat model. The vocabulary sets the canonical spelling (including case). Works only when the vocabulary is not empty; if it fails, the original text is delivered.",
+        "После распознавания искажённые термины из словаря исправляет chat-модель Groq. Словарь задаёт каноническое написание (включая регистр). Работает только при непустом словаре; при сбое доставляется исходный текст.");
+    public static string LlmChecking => Loc.T("Checking model availability…", "Проверка доступности модели…");
+    public static string LlmAvailable => Loc.T("✓ Model is available.", "✓ Модель доступна.");
+    public static string LlmUnavailableFmt => Loc.T("✗ {0}", "✗ {0}");
+    public static string LlmBlockedFmt => Loc.T(
+        "Model {0} is blocked for your Groq org. Allow it at console.groq.com → Settings → Limits.",
+        "Модель {0} заблокирована для вашей организации Groq. Разрешите её в console.groq.com → Settings → Limits.");
+
+    // Reset settings (spec §11)
+    public static string BtnResetSettings => Loc.T("Reset settings…", "Сбросить настройки…");
+    public static string ResetTitle => Loc.T("Reset settings?", "Сбросить настройки?");
+    public static string ResetMsg => Loc.T(
+        "Settings will return to their defaults. Your API key, history, audio, and vocabulary are kept.",
+        "Настройки вернутся к значениям по умолчанию. Ключ, история, аудио и словарь сохранятся.");
+    public static string ResetDone => Loc.T("Settings reset to defaults.", "Настройки сброшены к значениям по умолчанию.");
     public static string LblApiKey => Loc.T("Groq API key", "Ключ Groq API");
     public static string ChkShow => Loc.T("Show", "Показать");
     public static string BtnValidate => Loc.T("Validate", "Проверить");
