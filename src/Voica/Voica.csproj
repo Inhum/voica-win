@@ -27,8 +27,9 @@
     <RuntimeIdentifier Condition="'$(PublishSingleFile)' == 'true'">win-x64</RuntimeIdentifier>
     <SelfContained Condition="'$(PublishSingleFile)' == 'true'">true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
-    <!-- Compress the embedded runtime: ~180 MB → ~75 MB, at a small one-time startup extraction cost. -->
-    <EnableCompressionInSingleFile Condition="'$(PublishSingleFile)' == 'true'">true</EnableCompressionInSingleFile>
+    <!-- Compress the embedded runtime: ~180 MB → ~75 MB, at a small one-time startup extraction cost.
+         Only valid for self-contained bundles (framework-dependent publish rejects it, NETSDK1176). -->
+    <EnableCompressionInSingleFile Condition="'$(PublishSingleFile)' == 'true' and '$(SelfContained)' != 'false'">true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
