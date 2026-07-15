@@ -4,13 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-07-15
 
 ### Added
 - **Dictate** tray-menu item (spec §4.1): manual start/stop without the hotkey. Always toggle
   semantics — idle starts, recording stops, transcribing is ignored. Menu order now follows the
   spec (Dictate · History · Settings · About · Check for Updates · Quit), and a left click on the
   tray icon opens the menu too.
+- Release workflow: binaries are built, self-tested, and published by GitHub Actions from the
+  pushed tag (groundwork for SignPath code signing).
 
 ## [0.2.0] - 2026-07-13
 
@@ -50,5 +52,6 @@ All notable changes to this project are documented here. The format is based on
 - English/Russian localization by system language.
 - `--test-all` self‑test (no GUI/network) and a `windows-latest` CI workflow.
 
+[0.3.0]: https://github.com/Inhum/voica-win/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Inhum/voica-win/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Inhum/voica-win/releases/tag/v0.1.0

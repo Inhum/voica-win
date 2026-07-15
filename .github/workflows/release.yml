@@ -1,0 +1,61 @@
+name: Release
+
+# Builds release binaries on GitHub's infrastructure from the pushed tag and attaches them to a
+# GitHub Release. Releases are reproducible from the tagged commit — a prerequisite for code
+# signing via SignPath Foundation (signing step to be added once the application is approved).
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish self-contained (compressed single file)
+        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -o out/self
+
+      - name: Publish framework-dependent (small, needs .NET 8 Desktop Runtime)
+        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -p:SelfContained=false -o out/fx
+
+      - name: Self-test both binaries
+        shell: pwsh
+        run: |
+          foreach ($exe in @("out/self/Voica.exe", "out/fx/Voica.exe")) {
+            $p = Start-Process -FilePath $exe -ArgumentList "--test-all" -Wait -PassThru -NoNewWindow
+            Write-Host "$exe --test-all exit=$($p.ExitCode)"
+            if ($p.ExitCode -ne 0) { exit 1 }
+          }
+
+      - name: Stage assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out/assets | Out-Null
+          Copy-Item out/self/Voica.exe out/assets/Voica.exe
+          Copy-Item out/fx/Voica.exe out/assets/Voica-fx.exe
+          Get-ChildItem out/assets | Select-Object Name, Length
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $notes = ".github/release-notes/$tag.md"
+          $cliArgs = @("release", "create", $tag,
+                       "out/assets/Voica.exe", "out/assets/Voica-fx.exe",
+                       "--title", "Voica $tag")
+          if (Test-Path $notes) { $cliArgs += @("--notes-file", $notes) }
+          else { $cliArgs += "--generate-notes" }
+          gh @cliArgs
