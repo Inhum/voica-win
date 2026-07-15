@@ -1,3 +1,5 @@
+<p align="center"><a href="README.md">English</a> · <b>Русский</b></p>
+
 <p align="center">
   <img src="docs/icon.png" width="128" alt="Иконка Voica">
 </p>
@@ -12,10 +14,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4" alt="Windows 10 1809+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="Лицензия MIT">
   <img src="https://img.shields.io/badge/built%20with-C%23%20%2F%20.NET%208-512BD4" alt="C# / .NET 8">
-</p>
-
-<p align="center">
-  <a href="README.md">English</a> · Русский
+  <a href="https://deepwiki.com/Inhum/voica-win"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 ---
@@ -100,6 +99,20 @@ Voica — маленькое фоновое приложение в систем
 - `credentials.dat` — ключ Groq, зашифрованный DPAPI
 - `settings.json` — настройки
 - `voica.log` — локальный лог диагностики
+
+## Свой ключ Groq (BYO-key)
+
+Voica использует ваш **собственный** ключ Groq — приложение ничей ключ не раздаёт.
+Бесплатный ключ можно получить на [console.groq.com](https://console.groq.com); использование
+Groq API подчиняется [условиям Groq](https://groq.com/terms-of-use). Лимиты free-tier
+(whisper-large-v3-turbo): 20 запросов/мин, 2000/день, 7200 аудио-секунд/час — для диктовки
+более чем достаточно.
+
+**Если включаете ИИ-исправление терминов** (Настройки → Словарь), Voica дополнительно
+обращается к chat-модели `qwen/qwen3-32b`. Если в вашей организации Groq доступ к моделям
+ограничен — разрешите эту модель в console.groq.com → Settings → Limits, иначе исправление
+будет молча откатываться к исходному тексту (fail-open по замыслу). Рядом с тумблером в
+Настройках есть проверка доступности модели.
 
 ## Сборка из исходников
 

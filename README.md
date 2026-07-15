@@ -1,3 +1,5 @@
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a></p>
+
 <p align="center">
   <img src="docs/icon.png" width="128" alt="Voica icon">
 </p>
@@ -12,10 +14,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4" alt="Windows 10 1809+">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
   <img src="https://img.shields.io/badge/built%20with-C%23%20%2F%20.NET%208-512BD4" alt="C# / .NET 8">
-</p>
-
-<p align="center">
-  English · <a href="README.ru.md">Русский</a>
+  <a href="https://deepwiki.com/Inhum/voica-win"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 </p>
 
 ---
@@ -115,6 +114,19 @@ Everything lives outside the executable in `%APPDATA%\Voica\`, so it survives up
 - `credentials.dat` — DPAPI‑encrypted Groq key
 - `settings.json` — settings
 - `voica.log` — local diagnostic log
+
+## Bring your own Groq key
+
+Voica uses **your own** Groq API key (BYO-key) — the app never ships or shares anyone's key.
+Each user gets a free key at [console.groq.com](https://console.groq.com); usage is subject
+to [Groq's Terms of Use](https://groq.com/terms-of-use). Free-tier limits (whisper-large-v3-turbo):
+20 req/min, 2000/day, 7200 audio-seconds/hour — far more than dictation needs.
+
+**If you enable AI term correction** (Settings → Vocabulary), Voica also calls the chat model
+`qwen/qwen3-32b`. If your Groq organization restricts model access, allow this model at
+console.groq.com → Settings → Limits — otherwise the correction silently falls back to the
+raw transcription (fail-open by design). Settings shows a model-availability check next to
+the toggle.
 
 ## Build from source
 
