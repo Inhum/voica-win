@@ -21,6 +21,7 @@ public static class Loc
 public static class S
 {
     // Tray menu
+    public static string MenuDictate => Loc.T("Dictate", "Диктовать");
     public static string MenuSettings => Loc.T("Settings…", "Настройки…");
     public static string MenuHistory => Loc.T("History…", "История…");
     public static string MenuCheckUpdates => Loc.T("Check for Updates…", "Проверить обновления…");

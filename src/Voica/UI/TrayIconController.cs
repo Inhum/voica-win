@@ -45,6 +45,8 @@ public sealed class TrayIconController : IDisposable
             IconSource = _idleIcon,
             ToolTipText = S.Tray,
             ContextMenu = BuildMenu(),
+            // Spec §4.1: right click is the standard tray menu; left click duplicates it.
+            MenuActivation = PopupActivationMode.LeftOrRightClick,
         };
         // Clicking a Voica notification opens History (to review the result).
         _icon.TrayBalloonTipClicked += (_, _) => OpenHistory();
@@ -214,12 +216,14 @@ public sealed class TrayIconController : IDisposable
     {
         var menu = new ContextMenu();
 
-        menu.Items.Add(MenuItem(S.MenuSettings, (_, _) => OpenSettings()));
-        menu.Items.Add(MenuItem(S.MenuHistory, (_, _) => OpenHistory()));
+        // Order per spec §4.1: Dictate · — · History, Settings, About, Check for Updates · — · Quit.
+        menu.Items.Add(MenuItem(S.MenuDictate, (_, _) => _controller?.ToggleDictation()));
         menu.Items.Add(new Separator());
+        menu.Items.Add(MenuItem(S.MenuHistory, (_, _) => OpenHistory()));
+        menu.Items.Add(MenuItem(S.MenuSettings, (_, _) => OpenSettings()));
+        menu.Items.Add(MenuItem(S.MenuAbout, (_, _) => OpenAbout()));
         _updateMenuItem = MenuItem(S.MenuCheckUpdates, (_, _) => OnUpdateMenuClick());
         menu.Items.Add(_updateMenuItem);
-        menu.Items.Add(MenuItem(S.MenuAbout, (_, _) => OpenAbout()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItem(S.MenuQuit, (_, _) => Application.Current.Shutdown()));
 

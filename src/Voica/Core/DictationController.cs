@@ -68,6 +68,12 @@ public sealed class DictationController : IDisposable
         // Ignore while transcribing.
     }
 
+    /// <summary>
+    /// Manual start/stop from the tray menu (spec §4.1). Always toggle semantics regardless of
+    /// the hotkey mode: idle → start, recording → stop, transcribing → ignored.
+    /// </summary>
+    public void ToggleDictation() => OnToggle();
+
     private void BeginRecording()
     {
         try

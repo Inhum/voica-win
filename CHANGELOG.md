@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Dictate** tray-menu item (spec §4.1): manual start/stop without the hotkey. Always toggle
+  semantics — idle starts, recording stops, transcribing is ignored. Menu order now follows the
+  spec (Dictate · History · Settings · About · Check for Updates · Quit), and a left click on the
+  tray icon opens the menu too.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added
