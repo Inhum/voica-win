@@ -97,6 +97,9 @@ public static class S
     public static string LlmBlockedFmt => Loc.T(
         "Model {0} is blocked for your Groq org. Allow it at console.groq.com → Settings → Limits.",
         "Модель {0} заблокирована для вашей организации Groq. Разрешите её в console.groq.com → Settings → Limits.");
+    public static string LlmNotFoundFmt => Loc.T(
+        "Model {0} is unavailable (Groq may have renamed or removed it) — please update the app.",
+        "Модель {0} недоступна (Groq мог переименовать или убрать её) — обновите приложение.");
 
     // Reset settings (spec §11)
     public static string BtnResetSettings => Loc.T("Reset settings…", "Сбросить настройки…");

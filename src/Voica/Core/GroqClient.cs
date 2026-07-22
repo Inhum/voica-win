@@ -29,7 +29,9 @@ public sealed class GroqException : Exception
 public static class GroqClient
 {
     public const string Model = "whisper-large-v3-turbo";
-    public const string PostProcessModel = "qwen/qwen3-32b";   // spec §6.1
+    // Spec §6.1. Groq periodically removes/renames models (qwen/qwen3-32b vanished → 404), so the
+    // availability probe must distinguish 404 (update the app) from 403 (blocked in the Groq org).
+    public const string PostProcessModel = "llama-3.3-70b-versatile";
     public const int PromptCharBudget = 800;
 
     public static readonly Uri Endpoint = new("https://api.groq.com/openai/v1/audio/transcriptions");
@@ -196,6 +198,7 @@ public static class GroqClient
             {
                 >= 200 and < 300 => null,
                 403 => string.Format(S.LlmBlockedFmt, PostProcessModel),
+                404 => string.Format(S.LlmNotFoundFmt, PostProcessModel),
                 401 => S.KeyValidRejected,
                 var code => $"HTTP {code}",
             };
@@ -216,7 +219,6 @@ public static class GroqClient
         {
             model = PostProcessModel,
             temperature = 0,
-            reasoning_effort = "none",   // qwen3 is a thinking model; no reasoning needed here
             max_completion_tokens = maxCompletionTokens,
             messages = new[] { new { role = "user", content = userContent } },
         };

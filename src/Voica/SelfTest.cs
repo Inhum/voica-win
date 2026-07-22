@@ -55,7 +55,7 @@ public static class SelfTest
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
         // --- LLM post-processing prompt (spec §6.1) ---
-        Check("postprocess model", GroqClient.PostProcessModel == "qwen/qwen3-32b");
+        Check("postprocess model", GroqClient.PostProcessModel == "llama-3.3-70b-versatile");
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
         Check("postprocess prompt null on empty vocab",
             GroqClient.PostProcessPromptText("текст", "  \n ") is null);

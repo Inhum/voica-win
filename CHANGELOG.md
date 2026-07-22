@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-17
+
+### Fixed
+- **AI term correction was silently broken**: Groq removed the `qwen/qwen3-32b` model (HTTP 404),
+  so corrections fell back to the raw transcription. Switched to **`llama-3.3-70b-versatile`**
+  per the updated spec (§6.1). The availability check in Settings now distinguishes a removed
+  model (404 → "update the app") from one blocked in your Groq org (403 → "allow it in the
+  console").
+
 ## [0.3.0] - 2026-07-15
 
 ### Added
@@ -52,6 +61,7 @@ All notable changes to this project are documented here. The format is based on
 - English/Russian localization by system language.
 - `--test-all` self‑test (no GUI/network) and a `windows-latest` CI workflow.
 
+[0.3.1]: https://github.com/Inhum/voica-win/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Inhum/voica-win/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Inhum/voica-win/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Inhum/voica-win/releases/tag/v0.1.0
