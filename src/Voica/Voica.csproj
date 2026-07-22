@@ -16,7 +16,7 @@
     <ApplicationIcon>Resources\voica.ico</ApplicationIcon>
 
     <!-- Version: single source of truth (spec §12). -->
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <Product>Voica</Product>
     <Company>Inhum</Company>
     <Authors>Ivan Ushakov</Authors>

@@ -20,6 +20,7 @@ public partial class HistoryWindow : Window
         public string Preview => Item.Text.Replace("\r", " ").Replace("\n", " ");
         public string Lang => Item.Language ?? "";
         public string Duration => Item.Duration is { } d ? $"{d:0.0}s" : "";
+        public string ModelName => Item.Model ?? "";
         public string AudioMark => Item.AudioPath is not null && File.Exists(Item.AudioPath) ? "♪" : "";
     }
 

@@ -24,6 +24,7 @@
                 <DataGridTextColumn Header="{x:Static l:S.ColText}" Binding="{Binding Preview}" Width="*" />
                 <DataGridTextColumn Header="{x:Static l:S.ColLang}" Binding="{Binding Lang}" Width="70" />
                 <DataGridTextColumn Header="{x:Static l:S.ColDur}" Binding="{Binding Duration}" Width="60" />
+                <DataGridTextColumn Header="{x:Static l:S.ColModel}" Binding="{Binding ModelName}" Width="150" />
                 <DataGridTextColumn Header="{x:Static l:S.ColAudio}" Binding="{Binding AudioMark}" Width="55" />
             </DataGrid.Columns>
         </DataGrid>

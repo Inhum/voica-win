@@ -80,6 +80,11 @@ public static class S
 
     // Settings window
     public static string SettingsTitle => Loc.T("Voica — Settings", "Voica — Настройки");
+    public static string TabGeneral => Loc.T("General", "Общие");
+    public static string TabDictation => Loc.T("Dictation", "Диктовка");
+    public static string TabVocabulary => Loc.T("Vocabulary", "Словарь");
+    public static string TabData => Loc.T("Data", "Данные");
+    public static string ModelDiskFmt => Loc.T("On disk: {0} MB.", "На диске: {0} МБ.");
     public static string LblDictationMode => Loc.T("Dictation mode", "Режим диктовки");
     public static string ModePtt => Loc.T("Push-to-talk (hold)", "Push-to-talk (удержание)");
     public static string ModeToggle => Loc.T("Toggle (press to start / stop)", "Toggle (нажать — старт/стоп)");
@@ -148,6 +153,7 @@ public static class S
     public static string ColText => Loc.T("Text", "Текст");
     public static string ColLang => Loc.T("Lang", "Язык");
     public static string ColDur => Loc.T("Dur", "Длит.");
+    public static string ColModel => Loc.T("Model", "Модель");
     public static string ColAudio => Loc.T("Audio", "Аудио");
     public static string BtnCopy => Loc.T("Copy", "Копировать");
     public static string BtnPlay => Loc.T("Play", "Играть");
@@ -186,9 +192,11 @@ public static class S
 
     // About window
     public static string AboutTitle => Loc.T("About Voica", "О программе Voica");
-    public static string AboutTagline => Loc.T("Dictation to punctuated text via Groq Whisper.", "Диктовка → текст с пунктуацией через Groq Whisper.");
+    public static string AboutTagline => Loc.T(
+        "Voice dictation with punctuation — Groq Whisper in the cloud or GigaAM on this PC.",
+        "Диктовка с пунктуацией — Groq Whisper в облаке или GigaAM на этом ПК.");
     public static string AboutPrivacy => Loc.T(
-        "Privacy: no backend, no telemetry. Network is used only for Groq (transcription) and GitHub (optional update checks).",
-        "Приватность: нет бэкенда и телеметрии. Сеть используется только для Groq (расшифровка) и GitHub (проверка обновлений).");
+        "Privacy: no backend, no telemetry. Network is used only for Groq (cloud transcription / AI correction) and GitHub (update checks, one-time model download). With the local engine, audio never leaves this PC.",
+        "Приватность: нет бэкенда и телеметрии. Сеть — только Groq (облачная расшифровка / ИИ-исправление) и GitHub (обновления, разовая докачка модели). С локальным движком аудио не покидает этот ПК.");
     public static string AboutVersionFmt => Loc.T("Version {0}", "Версия {0}");
 }

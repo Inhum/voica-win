@@ -61,7 +61,8 @@ public sealed class LocalEngine : IDisposable
             }
 
             Touch();
-            return new TranscriptionResult(text.ToString().Trim(), "ru", duration);
+            // "Russian" (not "ru") to match the language names Groq verbose_json reports.
+            return new TranscriptionResult(text.ToString().Trim(), "Russian", duration);
         }, cancellationToken);
     }
 

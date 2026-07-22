@@ -2,124 +2,124 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Voica"
-        Title="{x:Static l:S.SettingsTitle}" Width="540" SizeToContent="Height"
+        Title="{x:Static l:S.SettingsTitle}" Width="560" SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <!-- 0 engine -->
-            <RowDefinition Height="Auto" /> <!-- 1 engine status/hint -->
-            <RowDefinition Height="Auto" /> <!-- 2 mode -->
-            <RowDefinition Height="Auto" /> <!-- 3 hotkey -->
-            <RowDefinition Height="Auto" /> <!-- 4 hotkey hint -->
-            <RowDefinition Height="Auto" /> <!-- 5 output -->
-            <RowDefinition Height="Auto" /> <!-- 6 toggles -->
-            <RowDefinition Height="Auto" /> <!-- 7 retention -->
-            <RowDefinition Height="Auto" /> <!-- 8 vocab -->
-            <RowDefinition Height="Auto" /> <!-- 9 vocab hint -->
-            <RowDefinition Height="Auto" /> <!-- 10 key label + box -->
-            <RowDefinition Height="Auto" /> <!-- 11 key buttons -->
-            <RowDefinition Height="Auto" /> <!-- 12 key status -->
-            <RowDefinition Height="Auto" /> <!-- 13 separator -->
-            <RowDefinition Height="Auto" /> <!-- 14 bottom actions -->
-        </Grid.RowDefinitions>
-
-        <!-- Recognition engine (spec §2.5) -->
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static l:S.LblEngine}" VerticalAlignment="Center" Margin="0,6,12,6" />
-        <ComboBox x:Name="EngineCombo" Grid.Row="0" Grid.Column="1" Margin="0,6" SelectionChanged="OnEngineChanged" />
-        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,6">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="ModelStatusText" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <Button x:Name="DownloadModelButton" Content="{x:Static l:S.BtnDownloadModel}" Width="90" Height="24"
-                        Margin="8,0,0,0" Click="OnDownloadModel" />
-                <Button x:Name="DeleteModelButton" Content="{x:Static l:S.BtnDeleteModel}" Width="110" Height="24"
-                        Margin="8,0,0,0" Click="OnDeleteModel" />
-            </StackPanel>
-            <ProgressBar x:Name="ModelProgress" Height="6" Margin="0,6,0,0" Minimum="0" Maximum="100"
-                         Visibility="Collapsed" />
-            <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0" Text="{x:Static l:S.EngineHint}" />
-        </StackPanel>
-
-        <!-- Dictation mode -->
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static l:S.LblDictationMode}" VerticalAlignment="Center" Margin="0,6,12,6" />
-        <ComboBox x:Name="ModeCombo" Grid.Row="2" Grid.Column="1" Margin="0,6" SelectionChanged="OnModeChanged" />
-
-        <!-- Hotkey -->
-        <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static l:S.LblHotkey}" VerticalAlignment="Center" Margin="0,6,12,6" />
-        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-            <ComboBox x:Name="KeyCombo" Width="200" SelectionChanged="OnKeyChanged" />
-            <Button x:Name="CustomKeyButton" Content="{x:Static l:S.BtnCustom}" Width="86" Height="26" Margin="8,0,0,0" Click="OnCustomKey" />
-        </StackPanel>
-        <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,0,0,6">
-            <TextBlock x:Name="CurrentHotkeyText" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.HotkeyHint}" />
-        </StackPanel>
-
-        <!-- Output -->
-        <TextBlock Grid.Row="5" Grid.Column="0" Text="{x:Static l:S.LblOutput}" VerticalAlignment="Center" Margin="0,6,12,6" />
-        <ComboBox x:Name="OutputCombo" Grid.Row="5" Grid.Column="1" Margin="0,6" SelectionChanged="OnOutputChanged" />
-
-        <!-- Toggles -->
-        <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,6">
-            <CheckBox x:Name="StoreAudioCheck" Content="{x:Static l:S.ChkStoreAudio}" Margin="0,2"
-                      Checked="OnStoreAudioChanged" Unchecked="OnStoreAudioChanged" />
-            <CheckBox x:Name="NotifyInsertCheck" Content="{x:Static l:S.ChkNotify}" Margin="0,2"
-                      Checked="OnNotifyInsertChanged" Unchecked="OnNotifyInsertChanged" />
-            <CheckBox x:Name="CheckUpdatesCheck" Content="{x:Static l:S.ChkCheckUpdates}" Margin="0,2"
-                      Checked="OnCheckUpdatesChanged" Unchecked="OnCheckUpdatesChanged" />
-        </StackPanel>
-
-        <!-- Retention -->
-        <TextBlock Grid.Row="7" Grid.Column="0" Text="{x:Static l:S.LblRetention}" VerticalAlignment="Center" Margin="0,6,12,6" />
-        <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="0,6">
-            <TextBox x:Name="RetentionBox" Width="60" LostFocus="OnRetentionChanged" />
-            <TextBlock Text="{x:Static l:S.RetentionSuffix}" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
-        </StackPanel>
-
-        <!-- Vocabulary -->
-        <TextBlock Grid.Row="8" Grid.Column="0" Text="{x:Static l:S.LblVocabulary}" VerticalAlignment="Top" Margin="0,8,12,6" />
-        <TextBox x:Name="VocabularyBox" Grid.Row="8" Grid.Column="1" Margin="0,6"
-                 Height="72" AcceptsReturn="True" TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto"
-                 TextChanged="OnVocabularyTextChanged" LostFocus="OnVocabularyChanged" />
-        <StackPanel Grid.Row="9" Grid.Column="1" Margin="0,0,0,8">
-            <TextBlock x:Name="VocabCounter" HorizontalAlignment="Right" Opacity="0.7" />
-            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.VocabHint}" />
-            <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" Margin="0,8,0,2"
-                      Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
-            <TextBlock x:Name="LlmStatusText" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,0,2" />
-            <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.LlmHint}" />
-        </StackPanel>
-
-        <!-- API key -->
-        <TextBlock Grid.Row="10" Grid.Column="0" Text="{x:Static l:S.LblApiKey}" VerticalAlignment="Center" Margin="0,10,12,6" />
-        <Grid Grid.Row="10" Grid.Column="1" Margin="0,10,0,4">
-            <PasswordBox x:Name="KeyBox" Height="26" VerticalContentAlignment="Center" />
-            <TextBox x:Name="KeyBoxVisible" Height="26" VerticalContentAlignment="Center" Visibility="Collapsed" />
-        </Grid>
-        <StackPanel Grid.Row="11" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
-            <CheckBox x:Name="ShowKeyCheck" Content="{x:Static l:S.ChkShow}" VerticalAlignment="Center" Margin="0,0,16,0"
-                      Checked="OnToggleShowKey" Unchecked="OnToggleShowKey" />
-            <Button x:Name="ValidateButton" Content="{x:Static l:S.BtnValidate}" Width="84" Height="26" Margin="0,0,8,0" Click="OnValidateKey" />
-            <Button x:Name="SaveKeyButton" Content="{x:Static l:S.BtnSave}" Width="76" Height="26" Click="OnSaveKey" />
-        </StackPanel>
-        <TextBlock x:Name="KeyStatusText" Grid.Row="12" Grid.Column="1" Margin="0,0,0,6" Opacity="0.8" TextWrapping="Wrap" />
-
-        <Separator Grid.Row="13" Grid.ColumnSpan="2" Margin="0,10" />
-
-        <!-- Bottom actions -->
-        <Grid Grid.Row="14" Grid.ColumnSpan="2">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button Content="{x:Static l:S.BtnDeleteAll}" Width="150" Height="28"
-                        Foreground="#C0392B" Click="OnDeleteAllData" />
-                <Button Content="{x:Static l:S.BtnResetSettings}" Width="150" Height="28"
-                        Margin="8,0,0,0" Click="OnResetSettings" />
-            </StackPanel>
+    <DockPanel Margin="12">
+        <!-- Bottom actions (shared across tabs) -->
+        <Grid DockPanel.Dock="Bottom" Margin="4,10,4,0">
             <Button Content="{x:Static l:S.BtnClose}" HorizontalAlignment="Right" Width="90" Height="28" IsCancel="True" Click="OnClose" />
         </Grid>
-    </Grid>
+
+        <TabControl>
+            <!-- ============ General: engine · API key · updates · reset (spec §2.5/§9/§10/§11) ============ -->
+            <TabItem Header="{x:Static l:S.TabGeneral}">
+                <StackPanel Margin="12">
+                    <TextBlock Text="{x:Static l:S.LblEngine}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <ComboBox x:Name="EngineCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnEngineChanged" />
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock x:Name="ModelStatusText" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="330" />
+                        <Button x:Name="DownloadModelButton" Content="{x:Static l:S.BtnDownloadModel}" Width="90" Height="24"
+                                Margin="8,0,0,0" Click="OnDownloadModel" />
+                    </StackPanel>
+                    <ProgressBar x:Name="ModelProgress" Height="6" Margin="0,6,0,0" Minimum="0" Maximum="100" Visibility="Collapsed" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0" Text="{x:Static l:S.EngineHint}" />
+
+                    <Separator Margin="0,12" />
+
+                    <TextBlock Text="{x:Static l:S.LblApiKey}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <Grid>
+                        <PasswordBox x:Name="KeyBox" Height="26" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="KeyBoxVisible" Height="26" VerticalContentAlignment="Center" Visibility="Collapsed" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <CheckBox x:Name="ShowKeyCheck" Content="{x:Static l:S.ChkShow}" VerticalAlignment="Center" Margin="0,0,16,0"
+                                  Checked="OnToggleShowKey" Unchecked="OnToggleShowKey" />
+                        <Button x:Name="ValidateButton" Content="{x:Static l:S.BtnValidate}" Width="84" Height="26" Margin="0,0,8,0" Click="OnValidateKey" />
+                        <Button x:Name="SaveKeyButton" Content="{x:Static l:S.BtnSave}" Width="76" Height="26" Click="OnSaveKey" />
+                    </StackPanel>
+                    <TextBlock x:Name="KeyStatusText" Margin="0,6,0,0" Opacity="0.8" TextWrapping="Wrap" />
+
+                    <Separator Margin="0,12" />
+
+                    <CheckBox x:Name="CheckUpdatesCheck" Content="{x:Static l:S.ChkCheckUpdates}" Margin="0,2"
+                              Checked="OnCheckUpdatesChanged" Unchecked="OnCheckUpdatesChanged" />
+
+                    <Separator Margin="0,12" />
+
+                    <Button Content="{x:Static l:S.BtnResetSettings}" Width="150" Height="26"
+                            HorizontalAlignment="Left" Click="OnResetSettings" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,4,0,0" Text="{x:Static l:S.ResetMsg}" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ Dictation: mode · hotkey · output (spec §4/§5) ============ -->
+            <TabItem Header="{x:Static l:S.TabDictation}">
+                <StackPanel Margin="12">
+                    <TextBlock Text="{x:Static l:S.LblDictationMode}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <ComboBox x:Name="ModeCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnModeChanged" />
+
+                    <TextBlock Text="{x:Static l:S.LblHotkey}" FontWeight="SemiBold" Margin="0,14,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="KeyCombo" Width="200" SelectionChanged="OnKeyChanged" />
+                        <Button x:Name="CustomKeyButton" Content="{x:Static l:S.BtnCustom}" Width="86" Height="26" Margin="8,0,0,0" Click="OnCustomKey" />
+                    </StackPanel>
+                    <TextBlock x:Name="CurrentHotkeyText" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" Text="{x:Static l:S.HotkeyHint}" />
+
+                    <TextBlock Text="{x:Static l:S.LblOutput}" FontWeight="SemiBold" Margin="0,14,0,4" />
+                    <ComboBox x:Name="OutputCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnOutputChanged" />
+
+                    <CheckBox x:Name="NotifyInsertCheck" Content="{x:Static l:S.ChkNotify}" Margin="0,12,0,0"
+                              Checked="OnNotifyInsertChanged" Unchecked="OnNotifyInsertChanged" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ Vocabulary: terms + AI correction (spec §6/§6.1) ============ -->
+            <TabItem Header="{x:Static l:S.TabVocabulary}">
+                <StackPanel Margin="12">
+                    <TextBlock Text="{x:Static l:S.LblVocabulary}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBox x:Name="VocabularyBox" Height="110" AcceptsReturn="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             TextChanged="OnVocabularyTextChanged" LostFocus="OnVocabularyChanged" />
+                    <TextBlock x:Name="VocabCounter" HorizontalAlignment="Right" Opacity="0.7" Margin="0,2,0,0" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.VocabHint}" />
+
+                    <Separator Margin="0,12" />
+
+                    <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" Margin="0,0,0,4"
+                              Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
+                    <TextBlock x:Name="LlmStatusText" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.LlmHint}" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ Data: audio · retention · local model · delete all (spec §8/§2.5/§11) ============ -->
+            <TabItem Header="{x:Static l:S.TabData}">
+                <StackPanel Margin="12">
+                    <CheckBox x:Name="StoreAudioCheck" Content="{x:Static l:S.ChkStoreAudio}" Margin="0,2"
+                              Checked="OnStoreAudioChanged" Unchecked="OnStoreAudioChanged" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="{x:Static l:S.LblRetention}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBox x:Name="RetentionBox" Width="60" LostFocus="OnRetentionChanged" />
+                        <TextBlock Text="{x:Static l:S.RetentionSuffix}" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
+                    </StackPanel>
+
+                    <Separator Margin="0,12" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="DeleteModelButton" Content="{x:Static l:S.BtnDeleteModel}" Width="110" Height="26"
+                                Click="OnDeleteModel" />
+                        <TextBlock x:Name="ModelDiskText" VerticalAlignment="Center" Margin="10,0,0,0" Opacity="0.8" />
+                    </StackPanel>
+
+                    <Separator Margin="0,12" />
+
+                    <Button Content="{x:Static l:S.BtnDeleteAll}" Width="150" Height="28"
+                            HorizontalAlignment="Left" Foreground="#C0392B" Click="OnDeleteAllData" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
 </Window>

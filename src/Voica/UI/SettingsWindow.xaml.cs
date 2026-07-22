@@ -86,8 +86,11 @@ public partial class SettingsWindow : Window
                 : string.Format(S.ModelNotDownloadedFmt, mb);
 
         DownloadModelButton.Visibility = !installed && !downloading ? Visibility.Visible : Visibility.Collapsed;
-        DeleteModelButton.Visibility = installed && !downloading ? Visibility.Visible : Visibility.Collapsed;
         ModelProgress.Visibility = downloading ? Visibility.Visible : Visibility.Collapsed;
+
+        // Data tab: on-disk footprint + delete.
+        DeleteModelButton.IsEnabled = installed;
+        ModelDiskText.Text = string.Format(S.ModelDiskFmt, installed ? mb : 0);
     }
 
     private void OnDownloadModel(object sender, RoutedEventArgs e)
