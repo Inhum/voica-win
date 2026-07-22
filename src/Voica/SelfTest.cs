@@ -104,6 +104,15 @@ public static class SelfTest
         Check("chunking splits correctly",
             chunks.Length == 3 && chunks[0] == (0, 400_000) && chunks[2] == (800_000, 200_000));
 
+        Check("stitch drops overlapping words",
+            LocalEngine.StitchOverlap("привет как дела", "как дела друзья") == "привет как дела друзья");
+        Check("stitch ignores case/punctuation at seam",
+            LocalEngine.StitchOverlap("это тест.", "Тест, дальше") == "это тест. дальше");
+        Check("stitch falls back to space-join",
+            LocalEngine.StitchOverlap("привет", "мир") == "привет мир");
+        Check("stitch handles empty",
+            LocalEngine.StitchOverlap("", "мир") == "мир" && LocalEngine.StitchOverlap("привет", "") == "привет");
+
         var savedEngine = Prefs.Engine;
         Prefs.Engine = EngineKind.Local;
         Check("prefs engine round-trip", Prefs.Engine == EngineKind.Local);

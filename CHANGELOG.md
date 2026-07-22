@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Local engine: adjacent 25 s chunks now overlap by 2 s and the transcripts are stitched with
+  seam de-duplication, so a word (and its punctuation) at a chunk boundary in long recordings is
+  no longer split or lost. Falls back to a plain join when no overlap is detected.
+
+### Internal
+- CI: bumped `actions/checkout` and `actions/setup-dotnet` to v5 (removes the Node 20 deprecation
+  warning).
+
 ## [0.4.0] - 2026-07-22
 
 ### Added

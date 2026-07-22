@@ -21,6 +21,10 @@ public sealed class LocalEngine : IDisposable
     public const int BlankId = 256;
     /// <summary>Chunk long recordings into ~25 s windows (the model is trained on short segments).</summary>
     public const int ChunkSeconds = 25;
+    /// <summary>Adjacent chunks overlap by this much so a word at the seam lands whole in one of them.</summary>
+    public const int OverlapSeconds = 2;
+    /// <summary>Cap on how many words the seam de-duplication compares.</summary>
+    private const int MaxOverlapWords = 12;
 
     private static readonly TimeSpan IdleUnload = TimeSpan.FromMinutes(5);
 
@@ -42,27 +46,27 @@ public sealed class LocalEngine : IDisposable
             double duration = samples.Length / (double)MelFrontend.SampleRate;
 
             var (session, vocab) = EnsureLoaded();
-            var text = new StringBuilder();
 
-            int chunkSamples = ChunkSeconds * MelFrontend.SampleRate;
-            foreach (var (offset, count) in Chunks(samples.Length, chunkSamples))
+            int window = ChunkSeconds * MelFrontend.SampleRate;
+            int step = (ChunkSeconds - OverlapSeconds) * MelFrontend.SampleRate;
+            string acc = "";
+            for (int offset = 0; offset < samples.Length; offset += step)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var chunk = new float[count];
-                Array.Copy(samples, offset, chunk, 0, count);
-                if (MelFrontend.FrameCount(count) < 1) continue;
-
-                string piece = Recognize(session, vocab, chunk);
-                if (piece.Length > 0)
+                int count = Math.Min(window, samples.Length - offset);
+                if (MelFrontend.FrameCount(count) >= 1)
                 {
-                    if (text.Length > 0 && text[^1] != ' ') text.Append(' ');
-                    text.Append(piece);
+                    var chunk = new float[count];
+                    Array.Copy(samples, offset, chunk, 0, count);
+                    string piece = Recognize(session, vocab, chunk);
+                    acc = acc.Length == 0 ? piece : StitchOverlap(acc, piece);
                 }
+                if (offset + count >= samples.Length) break;   // this window reached the end
             }
 
             Touch();
             // "Russian" (not "ru") to match the language names Groq verbose_json reports.
-            return new TranscriptionResult(text.ToString().Trim(), "Russian", duration);
+            return new TranscriptionResult(acc.Trim(), "Russian", duration);
         }, cancellationToken);
     }
 
@@ -72,6 +76,35 @@ public sealed class LocalEngine : IDisposable
         for (int offset = 0; offset < totalSamples; offset += chunkSamples)
             yield return (offset, Math.Min(chunkSamples, totalSamples - offset));
     }
+
+    /// <summary>
+    /// Joins two adjacent chunk transcripts, removing the text that overlapping audio produced
+    /// twice: finds the largest word-run where the tail of <paramref name="prev"/> matches the head
+    /// of <paramref name="next"/> (ignoring case/punctuation) and drops that duplicated head. If no
+    /// confident overlap is found, falls back to a plain space-join — never worse than a hard cut.
+    /// </summary>
+    public static string StitchOverlap(string prev, string next)
+    {
+        if (prev.Length == 0) return next;
+        if (next.Length == 0) return prev;
+
+        var pw = prev.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var nw = next.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        int max = Math.Min(Math.Min(pw.Length, nw.Length), MaxOverlapWords);
+
+        for (int k = max; k >= 1; k--)
+        {
+            bool match = true;
+            for (int i = 0; i < k && match; i++)
+                match = Normalize(pw[pw.Length - k + i]) == Normalize(nw[i]);
+            if (match)
+                return prev + " " + string.Join(' ', nw.Skip(k));
+        }
+        return prev + " " + next;
+    }
+
+    private static string Normalize(string word) =>
+        new string(word.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     private string Recognize(InferenceSession session, Dictionary<int, string> vocab, float[] samples)
     {
