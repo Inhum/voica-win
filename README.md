@@ -70,16 +70,38 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
 ## Requirements
 
 - Windows 10 version 1809 (build 17763) or later, x64.
-- A **Groq API key** — create one at <https://console.groq.com>. Voica uses the free tier's
-  `whisper-large-v3-turbo`.
+- A **Groq API key** for cloud recognition — create one at <https://console.groq.com> (free tier's
+  `whisper-large-v3-turbo`). Not needed if you use the [local offline engine](#local-offline-engine).
 
 ## Install
 
-1. Download `Voica.exe` from the [latest release](https://github.com/Inhum/voica-win/releases/latest).
-2. Run it. It's a single self‑contained file — no installer, no .NET required.
-   - The build is **not code‑signed yet**, so SmartScreen may warn ("Windows protected your PC").
-     Click **More info → Run anyway**. (Signing via SignPath is planned.)
-3. Voica appears in the system tray (no main window).
+Download from the [latest release](https://github.com/Inhum/voica-win/releases/latest) and run it —
+no installer needed:
+
+- **`Voica.exe`** (~80 MB) — fully self‑contained, nothing else to install.
+- **`Voica-fx.exe`** (~37 MB) — smaller, but needs the
+  [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) installed once.
+
+Voica runs in the system tray (no main window). See below about the SmartScreen warning.
+
+## Why does Windows warn about this app?
+
+Voica isn't code‑signed yet, so on first run SmartScreen shows *"Windows protected your PC."*
+Click **More info → Run anyway**. This is expected for an independent, unsigned app — not a sign
+that something is wrong:
+
+- Voica is **open source**, and every release is **built by GitHub Actions from the tagged commit**
+  (release author `github-actions[bot]`), not on anyone's personal machine — so the binary is
+  reproducible from the source you can read.
+- You can **verify your download**: the release page shows a `sha256:` digest next to each asset.
+  Compare it with your file (PowerShell):
+  ```powershell
+  Get-FileHash Voica.exe -Algorithm SHA256
+  ```
+  The hash must match the one shown on the release.
+
+Code signing (which removes the warning) is planned once the project has enough public visibility to
+qualify for the free [SignPath Foundation](https://signpath.org) program.
 
 ## First run
 
