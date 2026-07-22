@@ -20,7 +20,11 @@ public sealed record KeyValidation(KeyStatus Status, string Message);
 /// <summary>A Groq error already mapped to a user-facing message (spec §2).</summary>
 public sealed class GroqException : Exception
 {
-    public GroqException(string message) : base(message) { }
+    public GroqException(string message, bool isNetworkError = false) : base(message)
+        => IsNetworkError = isNetworkError;
+
+    /// <summary>True for connectivity failures/timeouts — the offline-fallback trigger (spec §2.5).</summary>
+    public bool IsNetworkError { get; }
 }
 
 /// <summary>
@@ -91,11 +95,11 @@ public static class GroqClient
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new GroqException(S.GroqTimeout);
+            throw new GroqException(S.GroqTimeout, isNetworkError: true);
         }
         catch (HttpRequestException ex)
         {
-            throw new GroqException(string.Format(S.GroqNetworkFmt, ex.Message));
+            throw new GroqException(string.Format(S.GroqNetworkFmt, ex.Message), isNetworkError: true);
         }
 
         var body = await response.Content.ReadAsStringAsync(cts.Token);

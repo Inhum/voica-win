@@ -116,6 +116,8 @@ public static class SelfTest
         File.Delete(shaTmp);
         Check("sha-256 helper", shaVal == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
         Check("model files declared", ModelManager.Files.Length == 3 && ModelManager.TotalSize > 200_000_000);
+        Check("groq network-error flag",
+            new GroqException("x", isNetworkError: true).IsNetworkError && !new GroqException("y").IsNetworkError);
 
         // --- Updater version comparison (spec §10) ---
         Check("update normalize v-prefix", Updater.Normalize("v0.5.0") == "0.5.0");

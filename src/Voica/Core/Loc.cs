@@ -77,6 +77,9 @@ public static class S
     public static string BtnDownloadModel => Loc.T("Download", "Скачать");
     public static string BtnDeleteModel => Loc.T("Delete model", "Удалить модель");
     public static string LocalPreparing => Loc.T("Preparing the local model…", "Готовлю локальную модель…");
+    public static string NoticeOfflineFallback => Loc.T(
+        "No network — transcribed with the local engine.",
+        "Нет сети — распознано локальным движком.");
 
     // Settings window
     public static string SettingsTitle => Loc.T("Voica — Settings", "Voica — Настройки");

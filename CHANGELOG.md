@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-22
+
+### Added
+- **Local offline engine** (spec §2.5): recognition fully on-device via GigaAM v3 e2e CTC
+  (Russian with punctuation, int8 ONNX through ONNX Runtime) — no network, no API key. The
+  model (~215 MB) downloads on demand from this repo's dedicated model release with a progress
+  bar and SHA-256 verification; deletable in Settings → Data. First use shows a "preparing the
+  model" notice; the model unloads from RAM after 5 minutes idle. Long recordings are chunked.
+- **Offline fallback**: when the cloud engine is selected but the network is down and the local
+  model is installed, dictation transparently falls back to the local engine with a small notice.
+- **Tabbed Settings** (General / Dictation / Vocabulary / Data) like the macOS app — fits small
+  displays.
+- History gains a **Model** column; the local engine reports its language as "Russian" for
+  consistency with Groq.
+
+### Changed
+- About window mentions both engines and the on-device privacy story.
+
 ## [0.3.1] - 2026-07-17
 
 ### Fixed
@@ -61,6 +79,7 @@ All notable changes to this project are documented here. The format is based on
 - English/Russian localization by system language.
 - `--test-all` self‑test (no GUI/network) and a `windows-latest` CI workflow.
 
+[0.4.0]: https://github.com/Inhum/voica-win/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Inhum/voica-win/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Inhum/voica-win/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Inhum/voica-win/releases/tag/v0.2.0

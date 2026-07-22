@@ -33,6 +33,9 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
   a **custom combination** (e.g. `Ctrl+Shift+Space`).
 - **Punctuation via Groq Whisper** (`whisper-large-v3-turbo`) — auto language detection (great for
   mixed Russian/English).
+- **Local offline engine** (optional) — recognition fully on your PC via **GigaAM v3** (Russian,
+  with punctuation), no network and no API key. If the cloud is selected but the network is down,
+  Voica automatically falls back to the local engine when the model is installed.
 - **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
   the clipboard as a fallback. Or show an editable **result window**.
 - **History** (SQLite) — browse, re‑copy, play the audio, delete.
@@ -41,15 +44,18 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
 - **Vocabulary** — a hint list of terms/names Whisper often mangles.
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.
-- **Privacy** — no backend, no telemetry. Network is used only for Groq (transcription) and GitHub
-  (optional update checks). Your API key is stored **encrypted with Windows DPAPI**.
+- **Privacy** — no backend, no telemetry. Network is used only for Groq (cloud transcription /
+  AI correction) and GitHub (optional update checks, one‑time model download). With the local
+  engine, audio never leaves your PC. Your API key is stored **encrypted with Windows DPAPI**.
 - **English & Russian** UI, by system language.
 
 ## Screenshots
 
-**Settings** — the whole app in one window:
+**Settings** — General (engine + key) and Vocabulary (terms + AI correction):
 
-![Settings window](docs/settings.png)
+![Settings — General](docs/settings-general.png)
+
+![Settings — Vocabulary](docs/settings-vocabulary.png)
 
 **History** — browse, re‑copy, play, delete:
 
@@ -112,8 +118,25 @@ Everything lives outside the executable in `%APPDATA%\Voica\`, so it survives up
 - `history.sqlite` — transcription history
 - `audio\*.wav` — stored recordings (16 kHz mono PCM)
 - `credentials.dat` — DPAPI‑encrypted Groq key
+- `models\` — the local recognition model (if downloaded)
 - `settings.json` — settings
 - `voica.log` — local diagnostic log
+
+## Local offline engine
+
+Switch **Settings → General → Recognition engine** to **Local** and Voica transcribes entirely
+on your PC with Sber's **GigaAM v3** (MIT) — Russian speech with punctuation and text
+normalization, **no network and no API key**. The model (~215 MB, int8 ONNX) downloads once from
+this repo's [model release](https://github.com/Inhum/voica-win/releases/tag/model-gigaam-v3-e2e-ctc-int8-1)
+with SHA‑256 verification, lives in `%APPDATA%\Voica\models\`, and can be deleted in
+Settings → Data. Notes:
+
+- The vocabulary hint (§ Whisper `prompt`) works only with the cloud engine; **AI term
+  correction works with both** (it needs a key and network).
+- If **cloud** is selected but the network is down and the model is installed, Voica falls back
+  to the local engine automatically and shows a small notice.
+- With the local engine (and AI correction off), audio and text **never leave your PC**.
+- ONNX conversion by [istupakov/gigaam-v3-onnx](https://huggingface.co/istupakov/gigaam-v3-onnx) (MIT).
 
 ## Bring your own Groq key
 

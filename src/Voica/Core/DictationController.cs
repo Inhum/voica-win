@@ -138,9 +138,30 @@ public sealed class DictationController : IDisposable
         {
             Log.Info($"transcribing ({(useLocal ? "local" : "cloud")})…");
             // Vocabulary prompt hint is a Whisper feature — cloud only (spec §6/§2.5).
-            var result = useLocal
-                ? await _localEngine.TranscribeAsync(recording.FilePath)
-                : await GroqClient.TranscribeAsync(recording.FilePath, key!, Prefs.Vocabulary);
+            TranscriptionResult result;
+            string modelUsed;
+            if (useLocal)
+            {
+                result = await _localEngine.TranscribeAsync(recording.FilePath);
+                modelUsed = ModelManager.ModelName;
+            }
+            else
+            {
+                try
+                {
+                    result = await GroqClient.TranscribeAsync(recording.FilePath, key!, Prefs.Vocabulary);
+                    modelUsed = GroqClient.Model;
+                }
+                catch (GroqException ex) when (ex.IsNetworkError && ModelManager.IsInstalled())
+                {
+                    // Offline fallback (spec §2.5): no network but the local model is here —
+                    // transcribe on-device and let the user know unobtrusively.
+                    Log.Info($"offline fallback to local engine ({ex.Message})");
+                    RaiseNotice(S.NoticeOfflineFallback);
+                    result = await _localEngine.TranscribeAsync(recording.FilePath);
+                    modelUsed = ModelManager.ModelName;
+                }
+            }
             Log.Info($"transcribed: {result.Text.Length} chars, lang={result.Language ?? "?"}, dur={result.Duration?.ToString("0.00") ?? "?"}");
 
             if (!string.IsNullOrWhiteSpace(result.Text))
@@ -163,7 +184,7 @@ public sealed class DictationController : IDisposable
                 // Persist the FINAL (corrected) text to history (spec §6.1). Store honors
                 // "store audio" (spec §8) — it keeps or deletes the temp WAV (already in AudioDir).
                 var id = Store.Shared.Insert(finalText, result.Language, result.Duration,
-                    useLocal ? ModelManager.ModelName : GroqClient.Model, recording.FilePath);
+                    modelUsed, recording.FilePath);
                 Log.Info($"saved to history id={id?.ToString() ?? "null"}");
             }
             else
