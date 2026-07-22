@@ -14,6 +14,7 @@ public sealed class DictationController : IDisposable
 {
     private readonly HotkeyManager _hotkey = new();
     private readonly Recorder _recorder = new();
+    private readonly LocalEngine _localEngine = new();
     private readonly Dispatcher _dispatcher;
 
     private DictationState _state = DictationState.Idle;
@@ -33,6 +34,8 @@ public sealed class DictationController : IDisposable
         _hotkey.Started += OnPttStart;
         _hotkey.Stopped += OnPttStop;
         _hotkey.Toggled += OnToggle;
+        // First-time model load takes seconds (spec §2.5) — tell the user it's not a hang.
+        _localEngine.PreparingModel += () => RaiseNotice(S.LocalPreparing);
     }
 
     public DictationState State => _state;
@@ -117,8 +120,12 @@ public sealed class DictationController : IDisposable
 
         Log.Info($"recording stopped: {recording.DurationSeconds:0.00}s, file {Path.GetFileName(recording.FilePath)}");
 
+        // Engine selection (spec §2.5): local only when chosen AND installed — while the model
+        // is not (yet) downloaded, the cloud keeps working.
+        bool useLocal = Prefs.Engine == EngineKind.Local && ModelManager.IsInstalled();
+
         var key = KeyStore.Load();
-        if (key is null)
+        if (!useLocal && key is null)
         {
             TryDelete(recording.FilePath);
             SetState(DictationState.Idle);
@@ -129,20 +136,23 @@ public sealed class DictationController : IDisposable
 
         try
         {
-            Log.Info("transcribing…");
-            var result = await GroqClient.TranscribeAsync(recording.FilePath, key, Prefs.Vocabulary);
+            Log.Info($"transcribing ({(useLocal ? "local" : "cloud")})…");
+            // Vocabulary prompt hint is a Whisper feature — cloud only (spec §6/§2.5).
+            var result = useLocal
+                ? await _localEngine.TranscribeAsync(recording.FilePath)
+                : await GroqClient.TranscribeAsync(recording.FilePath, key!, Prefs.Vocabulary);
             Log.Info($"transcribed: {result.Text.Length} chars, lang={result.Language ?? "?"}, dur={result.Duration?.ToString("0.00") ?? "?"}");
 
             if (!string.IsNullOrWhiteSpace(result.Text))
             {
                 var finalText = result.Text;
 
-                // AI term correction (spec §6.1): opt-in, needs a non-empty vocabulary; fail-open.
-                // The state stays Transcribing while this runs (icon keeps showing work).
-                if (Prefs.LlmPostProcess)
+                // AI term correction (spec §6.1): opt-in, applies to BOTH engines (needs key+net);
+                // fail-open. The state stays Transcribing while this runs.
+                if (Prefs.LlmPostProcess && key is not null)
                 {
                     finalText = await GroqClient.PostProcessAsync(finalText, key, Prefs.Vocabulary);
-                    if (!ReferenceEquals(finalText, result.Text) && finalText != result.Text)
+                    if (finalText != result.Text)
                         Log.Info($"llm post-process: corrected ({result.Text.Length} → {finalText.Length} chars)");
                     else
                         Log.Info("llm post-process: no changes (or skipped/fail-open)");
@@ -153,7 +163,7 @@ public sealed class DictationController : IDisposable
                 // Persist the FINAL (corrected) text to history (spec §6.1). Store honors
                 // "store audio" (spec §8) — it keeps or deletes the temp WAV (already in AudioDir).
                 var id = Store.Shared.Insert(finalText, result.Language, result.Duration,
-                    GroqClient.Model, recording.FilePath);
+                    useLocal ? ModelManager.ModelName : GroqClient.Model, recording.FilePath);
                 Log.Info($"saved to history id={id?.ToString() ?? "null"}");
             }
             else
@@ -225,5 +235,6 @@ public sealed class DictationController : IDisposable
     {
         _hotkey.Dispose();
         _recorder.Dispose();
+        _localEngine.Dispose();
     }
 }

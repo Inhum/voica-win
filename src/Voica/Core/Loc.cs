@@ -61,6 +61,23 @@ public static class S
     public static string KeyValidRejected => Loc.T("Key was rejected by Groq.", "Ключ отклонён Groq.");
     public static string KeyValidTimeout => Loc.T("Validation timed out.", "Проверка не ответила вовремя.");
 
+    // Local engine (spec §2.5)
+    public static string LblEngine => Loc.T("Recognition engine", "Движок распознавания");
+    public static string EngineCloud => Loc.T("Cloud (Groq Whisper)", "Облако (Groq Whisper)");
+    public static string EngineLocal => Loc.T("Local (offline, Russian)", "Локально (офлайн, русский)");
+    public static string EngineHint => Loc.T(
+        "Local runs entirely on this PC — no network, no API key (model: GigaAM v3, Russian with punctuation). The vocabulary hint works only with the cloud engine; AI term correction works with both.",
+        "Локальный движок работает целиком на этом ПК — без сети и ключа (модель GigaAM v3, русский с пунктуацией). Подсказка-словарь работает только с облаком; ИИ-исправление — с обоими движками.");
+    public static string ModelNotDownloadedFmt => Loc.T(
+        "Local model is not downloaded ({0} MB). Cloud is used until it is.",
+        "Локальная модель не скачана ({0} МБ). Пока используется облако.");
+    public static string ModelDownloadedFmt => Loc.T("Local model is installed ({0} MB).", "Локальная модель установлена ({0} МБ).");
+    public static string ModelDownloadingFmt => Loc.T("Downloading model… {0}%", "Скачиваю модель… {0}%");
+    public static string ModelDownloadFailedFmt => Loc.T("Model download failed: {0}", "Не удалось скачать модель: {0}");
+    public static string BtnDownloadModel => Loc.T("Download", "Скачать");
+    public static string BtnDeleteModel => Loc.T("Delete model", "Удалить модель");
+    public static string LocalPreparing => Loc.T("Preparing the local model…", "Готовлю локальную модель…");
+
     // Settings window
     public static string SettingsTitle => Loc.T("Voica — Settings", "Voica — Настройки");
     public static string LblDictationMode => Loc.T("Dictation mode", "Режим диктовки");

@@ -34,6 +34,7 @@ public static class Prefs
         public long LastUpdateCheckUnix { get; set; } = 0;       // 0 = never
         public string Vocabulary { get; set; } = "";             // spec §6
         public bool LlmPostProcess { get; set; } = false;        // spec §6.1, opt-in
+        public string Engine { get; set; } = "cloud";            // spec §2.5: "cloud" | "local"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
     }
 
@@ -125,6 +126,13 @@ public static class Prefs
     {
         get { lock (Gate) return _data.Vocabulary; }
         set { lock (Gate) { _data.Vocabulary = value ?? ""; Save(); } }
+    }
+
+    /// <summary>Recognition engine (spec §2.5): cloud (Groq, default) or local offline.</summary>
+    public static EngineKind Engine
+    {
+        get { lock (Gate) return _data.Engine.Equals("local", StringComparison.OrdinalIgnoreCase) ? EngineKind.Local : EngineKind.Cloud; }
+        set { lock (Gate) { _data.Engine = value == EngineKind.Local ? "local" : "cloud"; Save(); } }
     }
 
     /// <summary>Whether to fix vocabulary terms via the Groq LLM after transcription (spec §6.1, opt-in).</summary>

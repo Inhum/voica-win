@@ -9,6 +9,15 @@ public enum DictationMode
     Toggle,
 }
 
+/// <summary>Recognition engine (spec §2.5). Default is Cloud.</summary>
+public enum EngineKind
+{
+    /// <summary>Groq Whisper over the network (BYO-key).</summary>
+    Cloud,
+    /// <summary>On-device GigaAM (no network, no key).</summary>
+    Local,
+}
+
 /// <summary>Where recognized text goes (spec §5). Default is Insert.</summary>
 public enum OutputMode
 {

@@ -78,6 +78,45 @@ public static class SelfTest
             Prefs.Vocabulary == "__voica_reset_test__" && !Prefs.LlmPostProcess && Prefs.RetentionDays == 30);
         Prefs.Vocabulary = rsVocab; Prefs.LlmPostProcess = rsLlm; Prefs.RetentionDays = rsDays;
 
+        // --- Local engine (spec §2.5): pure logic, no model file needed ---
+        Check("mel frame count", MelFrontend.FrameCount(16000) == (16000 - 320) / 160 + 1);
+        Check("mel too-short is zero frames", MelFrontend.FrameCount(100) == 0);
+        var sine = new float[16000];
+        for (int i = 0; i < sine.Length; i++) sine[i] = (float)Math.Sin(2 * Math.PI * 440 * i / 16000.0);
+        var melOut = MelFrontend.Compute(sine);
+        bool melFinite = true;
+        for (int m = 0; m < MelFrontend.NMels && melFinite; m++)
+            for (int t = 0; t < melOut.GetLength(1) && melFinite; t++)
+                melFinite = float.IsFinite(melOut[m, t]);
+        Check("mel output shape and finite",
+            melOut.GetLength(0) == 64 && melOut.GetLength(1) == MelFrontend.FrameCount(16000) && melFinite);
+
+        var testVocab = LocalEngine.ParseVocab(new[] { "<unk> 0", "▁ 1", "п 2", "ри 3", "вет 4", "<blk> 256" });
+        Check("vocab parse", testVocab.Count == 6 && testVocab[4] == "вет" && testVocab[256] == "<blk>");
+
+        // CTC decode: blank-collapsed sequence "▁ п ри вет" → "привет"
+        var ctcLogits = new Microsoft.ML.OnnxRuntime.Tensors.DenseTensor<float>(new[] { 1, 6, 257 });
+        int[] frameIds = { 1, 256, 2, 2, 3, 4 };   // ▁, blank, п, п(repeat), ри, вет
+        for (int t = 0; t < frameIds.Length; t++) ctcLogits[0, t, frameIds[t]] = 10f;
+        Check("ctc greedy decode", LocalEngine.CtcGreedyDecode(ctcLogits, testVocab) == "привет");
+
+        var chunks = LocalEngine.Chunks(1_000_000, 400_000).ToArray();
+        Check("chunking splits correctly",
+            chunks.Length == 3 && chunks[0] == (0, 400_000) && chunks[2] == (800_000, 200_000));
+
+        var savedEngine = Prefs.Engine;
+        Prefs.Engine = EngineKind.Local;
+        Check("prefs engine round-trip", Prefs.Engine == EngineKind.Local);
+        Prefs.Engine = savedEngine;
+
+        // SHA-256 helper against a known vector ("abc").
+        var shaTmp = Path.Combine(Path.GetTempPath(), $"voica-sha-{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(shaTmp, "abc");
+        var shaVal = ModelManager.ComputeSha256Async(shaTmp).GetAwaiter().GetResult();
+        File.Delete(shaTmp);
+        Check("sha-256 helper", shaVal == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        Check("model files declared", ModelManager.Files.Length == 3 && ModelManager.TotalSize > 200_000_000);
+
         // --- Updater version comparison (spec §10) ---
         Check("update normalize v-prefix", Updater.Normalize("v0.5.0") == "0.5.0");
         Check("update isNewer patch", Updater.IsNewer("0.4.1", "0.4.0"));

@@ -20,11 +20,16 @@ public partial class SettingsWindow : Window
         _onHotkeyChanged = onHotkeyChanged;
         InitializeComponent();
         LoadFromPrefs();
+        Closed += (_, _) => _downloadCts?.Cancel();
     }
 
     private void LoadFromPrefs()
     {
         _loaded = false;
+
+        EngineCombo.ItemsSource = new[] { S.EngineCloud, S.EngineLocal };
+        EngineCombo.SelectedIndex = Prefs.Engine == EngineKind.Local ? 1 : 0;
+        RefreshModelStatus();
 
         ModeCombo.ItemsSource = new[] { S.ModePtt, S.ModeToggle };
         ModeCombo.SelectedIndex = Prefs.Mode == DictationMode.Ptt ? 0 : 1;
@@ -52,6 +57,75 @@ public partial class SettingsWindow : Window
         // Spec §6.1 UX: probe model availability when opening with the toggle already on.
         if (Prefs.LlmPostProcess)
             _ = ProbeChatModelAsync();
+    }
+
+    // --- Recognition engine + model (spec §2.5) ---
+
+    private System.Threading.CancellationTokenSource? _downloadCts;
+
+    private void OnEngineChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.Engine = EngineCombo.SelectedIndex == 1 ? EngineKind.Local : EngineKind.Cloud;
+
+        // Spec §2.5: the model downloads on demand when the local engine is first enabled.
+        if (Prefs.Engine == EngineKind.Local && !ModelManager.IsInstalled() && _downloadCts is null)
+            _ = DownloadModelAsync();
+        RefreshModelStatus();
+    }
+
+    private void RefreshModelStatus()
+    {
+        bool installed = ModelManager.IsInstalled();
+        bool downloading = _downloadCts is not null;
+        long mb = ModelManager.TotalSize / (1024 * 1024);
+
+        if (!downloading)
+            ModelStatusText.Text = installed
+                ? string.Format(S.ModelDownloadedFmt, mb)
+                : string.Format(S.ModelNotDownloadedFmt, mb);
+
+        DownloadModelButton.Visibility = !installed && !downloading ? Visibility.Visible : Visibility.Collapsed;
+        DeleteModelButton.Visibility = installed && !downloading ? Visibility.Visible : Visibility.Collapsed;
+        ModelProgress.Visibility = downloading ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnDownloadModel(object sender, RoutedEventArgs e)
+    {
+        if (_downloadCts is null) _ = DownloadModelAsync();
+    }
+
+    private async System.Threading.Tasks.Task DownloadModelAsync()
+    {
+        _downloadCts = new System.Threading.CancellationTokenSource();
+        RefreshModelStatus();
+        try
+        {
+            var progress = new Progress<double>(p =>
+            {
+                ModelProgress.Value = p * 100;
+                ModelStatusText.Text = string.Format(S.ModelDownloadingFmt, (int)(p * 100));
+            });
+            await ModelManager.DownloadAsync(progress, _downloadCts.Token);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("model download failed", ex);
+            MessageBox.Show(string.Format(S.ModelDownloadFailedFmt, ex.Message), "Voica",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _downloadCts.Dispose();
+            _downloadCts = null;
+            RefreshModelStatus();
+        }
+    }
+
+    private void OnDeleteModel(object sender, RoutedEventArgs e)
+    {
+        ModelManager.Delete();
+        RefreshModelStatus();
     }
 
     // --- Immediate-apply settings ---
