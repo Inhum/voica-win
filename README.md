@@ -1,4 +1,4 @@
-<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a></p>
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/Inhum/voica/blob/main/README.md">macOS version →</a></p>
 
 <p align="center">
   <img src="docs/icon.png" width="128" alt="Voica icon">
