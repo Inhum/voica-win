@@ -40,7 +40,24 @@ public static class SelfTest
             Paths.AudioDir.StartsWith(Paths.DataDir, StringComparison.OrdinalIgnoreCase));
 
         // --- Groq constants ---
-        Check("groq model", GroqClient.Model == "whisper-large-v3-turbo");
+        // --- STT model / language selection (spec §2) ---
+        Check("groq default stt model", GroqClient.DefaultSttModel == "whisper-large-v3-turbo");
+        Check("stt model list", GroqClient.SttModels.Length == 2
+            && GroqClient.SttModels[0] == "whisper-large-v3-turbo" && GroqClient.SttModels[1] == "whisper-large-v3");
+        Check("stt model normalize", GroqClient.NormalizeSttModel("whisper-large-v3") == "whisper-large-v3"
+            && GroqClient.NormalizeSttModel("qwen-nope") == GroqClient.DefaultSttModel
+            && GroqClient.NormalizeSttModel(null) == GroqClient.DefaultSttModel);
+        Check("language list and normalize",
+            GroqClient.Languages.Length == 3 && GroqClient.Languages[0] == "auto"
+            && GroqClient.NormalizeLanguage("ru") == "ru" && GroqClient.NormalizeLanguage("xx") == "auto");
+
+        var savedStt = Prefs.SttModel; var savedLang = Prefs.Language;
+        Prefs.SttModel = "whisper-large-v3"; Prefs.Language = "en";
+        Check("prefs stt/language round-trip", Prefs.SttModel == "whisper-large-v3" && Prefs.Language == "en");
+        Prefs.SttModel = "bogus"; Prefs.Language = "bogus";
+        Check("prefs stt/language reject invalid",
+            Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto");
+        Prefs.SttModel = savedStt; Prefs.Language = savedLang;
         Check("groq endpoint host", GroqClient.Endpoint.Host == "api.groq.com");
         Check("groq models endpoint host", GroqClient.ModelsEndpoint.Host == "api.groq.com");
 
@@ -198,7 +215,8 @@ public static class SelfTest
             Prefs.Mode == DictationMode.Toggle && Prefs.Hotkey == HotkeyBinding.Default
             && Prefs.Output == OutputMode.Insert && Prefs.RetentionDays == 30
             && Prefs.StoreAudio && Prefs.Vocabulary == "" && Prefs.CheckUpdatesOnLaunch
-            && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess);
+            && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess
+            && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto");
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;

@@ -149,8 +149,11 @@ public sealed class DictationController : IDisposable
             {
                 try
                 {
-                    result = await GroqClient.TranscribeAsync(recording.FilePath, key!, Prefs.Vocabulary);
-                    modelUsed = GroqClient.Model;
+                    // Model/language come from settings (spec §2); history records what actually ran.
+                    var sttModel = Prefs.SttModel;
+                    result = await GroqClient.TranscribeAsync(recording.FilePath, key!, Prefs.Vocabulary,
+                        sttModel, Prefs.Language);
+                    modelUsed = sttModel;
                 }
                 catch (GroqException ex) when (ex.IsNetworkError && ModelManager.IsInstalled())
                 {

@@ -70,6 +70,15 @@
                     <TextBlock Text="{x:Static l:S.LblOutput}" FontWeight="SemiBold" Margin="0,14,0,4" />
                     <ComboBox x:Name="OutputCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnOutputChanged" />
 
+                    <Separator Margin="0,14,0,10" />
+
+                    <TextBlock Text="{x:Static l:S.LblSttModel}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <ComboBox x:Name="SttModelCombo" Width="300" HorizontalAlignment="Left" SelectionChanged="OnSttModelChanged" />
+
+                    <TextBlock Text="{x:Static l:S.LblLanguage}" FontWeight="SemiBold" Margin="0,10,0,4" />
+                    <ComboBox x:Name="LanguageCombo" Width="300" HorizontalAlignment="Left" SelectionChanged="OnLanguageChanged" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,6,0,0" Text="{x:Static l:S.SttHint}" />
+
                     <CheckBox x:Name="NotifyInsertCheck" Content="{x:Static l:S.ChkNotify}" Margin="0,12,0,0"
                               Checked="OnNotifyInsertChanged" Unchecked="OnNotifyInsertChanged" />
                 </StackPanel>

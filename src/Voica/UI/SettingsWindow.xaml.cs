@@ -40,6 +40,12 @@ public partial class SettingsWindow : Window
         OutputCombo.ItemsSource = new[] { S.OutputInsert, S.OutputWindow };
         OutputCombo.SelectedIndex = Prefs.Output == OutputMode.Insert ? 0 : 1;
 
+        // Cloud STT model / language (spec §2); order matches GroqClient's arrays.
+        SttModelCombo.ItemsSource = new[] { S.SttTurbo, S.SttLarge };
+        SttModelCombo.SelectedIndex = Array.IndexOf(GroqClient.SttModels, Prefs.SttModel);
+        LanguageCombo.ItemsSource = new[] { S.LangAuto, S.LangRu, S.LangEn };
+        LanguageCombo.SelectedIndex = Array.IndexOf(GroqClient.Languages, Prefs.Language);
+
         StoreAudioCheck.IsChecked = Prefs.StoreAudio;
         NotifyInsertCheck.IsChecked = Prefs.NotifyOnInsert;
         CheckUpdatesCheck.IsChecked = Prefs.CheckUpdatesOnLaunch;
@@ -175,6 +181,18 @@ public partial class SettingsWindow : Window
     {
         if (!_loaded) return;
         Prefs.Output = OutputCombo.SelectedIndex == 0 ? OutputMode.Insert : OutputMode.Window;
+    }
+
+    private void OnSttModelChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || SttModelCombo.SelectedIndex < 0) return;
+        Prefs.SttModel = GroqClient.SttModels[SttModelCombo.SelectedIndex];
+    }
+
+    private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || LanguageCombo.SelectedIndex < 0) return;
+        Prefs.Language = GroqClient.Languages[LanguageCombo.SelectedIndex];
     }
 
     private void OnStoreAudioChanged(object sender, RoutedEventArgs e)

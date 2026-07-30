@@ -52,6 +52,9 @@ public static class S
     public static string GroqRejected => Loc.T("Groq rejected the API key. Check it in Settings.", "Groq отклонил ключ. Проверьте его в Настройках.");
     public static string GroqTooLong => Loc.T("Recording is too long — split it into shorter parts.", "Запись слишком длинная — разбейте её на части.");
     public static string GroqRateLimit => Loc.T("Groq rate limit reached. Please wait and try again.", "Достигнут лимит Groq. Подождите и повторите.");
+    public static string SttBlockedFmt => Loc.T(
+        "Model {0} is blocked for your Groq org. Allow it at console.groq.com → Settings → Limits, or pick another model in Settings → Dictation.",
+        "Модель {0} заблокирована для вашей организации Groq. Разрешите её в console.groq.com → Settings → Limits или выберите другую в Настройках → Dictation.");
     public static string GroqReturnedFmt => Loc.T("Groq returned {0}: {1}", "Groq вернул {0}: {1}");
     public static string GroqTimeout => Loc.T("Groq request timed out. Please try again.", "Groq не ответил вовремя. Повторите.");
     public static string GroqNetworkFmt => Loc.T("Network error contacting Groq: {0}", "Сетевая ошибка при обращении к Groq: {0}");
@@ -97,6 +100,18 @@ public static class S
     public static string HotkeyHint => Loc.T(
         "A single key is reserved for dictation while Voica runs. A combination (e.g. Ctrl+Shift+Space) only triggers when pressed together, so it won't break other shortcuts.",
         "Одиночная клавиша занимается под диктовку, пока Voica запущена. Комбинация (напр. Ctrl+Shift+Space) срабатывает только целиком и не ломает другие сочетания.");
+    // Cloud STT model / language (spec §2)
+    public static string LblSttModel => Loc.T("Cloud model", "Облачная модель");
+    public static string SttTurbo => Loc.T("whisper-large-v3-turbo (faster)", "whisper-large-v3-turbo (быстрее)");
+    public static string SttLarge => Loc.T("whisper-large-v3 (more accurate)", "whisper-large-v3 (точнее)");
+    public static string LblLanguage => Loc.T("Language", "Язык");
+    public static string LangAuto => Loc.T("Auto-detect", "Определять автоматически");
+    public static string LangRu => Loc.T("Russian", "Русский");
+    public static string LangEn => Loc.T("English", "Английский");
+    public static string SttHint => Loc.T(
+        "Applies to the cloud engine only (the local engine is Russian-only). Forcing a language helps with short phrases that auto-detect gets wrong.",
+        "Действует только для облачного движка (локальный — русскоязычный). Жёсткий выбор языка помогает с короткими фразами, где автоопределение ошибается.");
+
     public static string LblOutput => Loc.T("Output", "Вывод");
     public static string OutputInsert => Loc.T("Insert into focused field", "Вставлять в активное поле");
     public static string OutputWindow => Loc.T("Show result window", "Показывать окно результата");

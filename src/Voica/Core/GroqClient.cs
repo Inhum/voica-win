@@ -32,7 +32,22 @@ public sealed class GroqException : Exception
 /// </summary>
 public static class GroqClient
 {
-    public const string Model = "whisper-large-v3-turbo";
+    /// <summary>Default speech-to-text model (spec §2): the faster of the two.</summary>
+    public const string DefaultSttModel = "whisper-large-v3-turbo";
+
+    /// <summary>Selectable STT models (spec §2): turbo is faster, large-v3 is more accurate.</summary>
+    public static readonly string[] SttModels = { "whisper-large-v3-turbo", "whisper-large-v3" };
+
+    /// <summary>Selectable recognition languages (spec §2): "auto" omits the field entirely.</summary>
+    public static readonly string[] Languages = { "auto", "ru", "en" };
+
+    /// <summary>Falls back to the default when a stored model is unknown (spec §2).</summary>
+    public static string NormalizeSttModel(string? model) =>
+        Array.Exists(SttModels, m => m == model) ? model! : DefaultSttModel;
+
+    /// <summary>Falls back to "auto" when a stored language is unknown (spec §2).</summary>
+    public static string NormalizeLanguage(string? language) =>
+        Array.Exists(Languages, l => l == language) ? language! : "auto";
     // Spec §6.1. Groq periodically removes/renames models (qwen/qwen3-32b vanished → 404), so the
     // availability probe must distinguish 404 (update the app) from 403 (blocked in the Groq org).
     public const string PostProcessModel = "llama-3.3-70b-versatile";
@@ -63,10 +78,18 @@ public static class GroqClient
         return trimmed;
     }
 
-    /// <summary>Transcribes an audio file. Throws <see cref="GroqException"/> with a user message on failure.</summary>
+    /// <summary>
+    /// Transcribes an audio file (spec §2). <paramref name="sttModel"/> and
+    /// <paramref name="language"/> come from settings; "auto" language omits the field so Whisper
+    /// detects it. Throws <see cref="GroqException"/> with a user message on failure.
+    /// </summary>
     public static async Task<TranscriptionResult> TranscribeAsync(
-        string audioFilePath, string apiKey, string? vocabulary, CancellationToken cancellationToken = default)
+        string audioFilePath, string apiKey, string? vocabulary,
+        string? sttModel = null, string? language = null, CancellationToken cancellationToken = default)
     {
+        var model = NormalizeSttModel(sttModel);
+        var lang = NormalizeLanguage(language);
+
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TranscribeTimeout);
 
@@ -77,13 +100,17 @@ public static class GroqClient
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         form.Add(fileContent, "file", Path.GetFileName(audioFilePath));
 
-        form.Add(new StringContent(Model), "model");
+        form.Add(new StringContent(model), "model");
         form.Add(new StringContent("verbose_json"), "response_format");
         form.Add(new StringContent("0"), "temperature");
 
         var prompt = PromptField(vocabulary);
         if (prompt is not null)
             form.Add(new StringContent(prompt), "prompt");
+
+        // "auto" → don't send the field at all, so Whisper detects the language itself (spec §2).
+        if (lang != "auto")
+            form.Add(new StringContent(lang), "language");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = form };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -105,7 +132,7 @@ public static class GroqClient
         var body = await response.Content.ReadAsStringAsync(cts.Token);
 
         if (!response.IsSuccessStatusCode)
-            throw new GroqException(MapError(response.StatusCode, body));
+            throw new GroqException(MapError(response.StatusCode, body, model));
 
         try
         {
@@ -115,10 +142,10 @@ public static class GroqClient
                 throw new GroqException(S.GroqNoText);
 
             var text = (textEl.GetString() ?? string.Empty).Trim();
-            string? language = root.TryGetProperty("language", out var langEl) ? langEl.GetString() : null;
+            string? detectedLanguage = root.TryGetProperty("language", out var langEl) ? langEl.GetString() : null;
             double? duration = root.TryGetProperty("duration", out var durEl) && durEl.TryGetDouble(out var d) ? d : null;
 
-            return new TranscriptionResult(text, language, duration);
+            return new TranscriptionResult(text, detectedLanguage, duration);
         }
         catch (JsonException)
         {
@@ -263,9 +290,11 @@ public static class GroqClient
         }
     }
 
-    private static string MapError(HttpStatusCode status, string body) => (int)status switch
+    private static string MapError(HttpStatusCode status, string body, string model) => (int)status switch
     {
         401 => S.GroqRejected,
+        // A model can be disabled for the user's Groq org — same fix as for the chat model (§6.1).
+        403 => string.Format(S.SttBlockedFmt, model),
         413 => S.GroqTooLong,
         429 => S.GroqRateLimit,
         var code => string.Format(S.GroqReturnedFmt, code, Trim(body)),

@@ -35,6 +35,8 @@ public static class Prefs
         public string Vocabulary { get; set; } = "";             // spec §6
         public bool LlmPostProcess { get; set; } = false;        // spec §6.1, opt-in
         public string Engine { get; set; } = "cloud";            // spec §2.5: "cloud" | "local"
+        public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
+        public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
     }
 
@@ -133,6 +135,20 @@ public static class Prefs
     {
         get { lock (Gate) return _data.Engine.Equals("local", StringComparison.OrdinalIgnoreCase) ? EngineKind.Local : EngineKind.Cloud; }
         set { lock (Gate) { _data.Engine = value == EngineKind.Local ? "local" : "cloud"; Save(); } }
+    }
+
+    /// <summary>Cloud speech-to-text model (spec §2). Unknown stored values fall back to the default.</summary>
+    public static string SttModel
+    {
+        get { lock (Gate) return GroqClient.NormalizeSttModel(_data.SttModel); }
+        set { lock (Gate) { _data.SttModel = GroqClient.NormalizeSttModel(value); Save(); } }
+    }
+
+    /// <summary>Recognition language for the cloud engine (spec §2): "auto" (default), "ru" or "en".</summary>
+    public static string Language
+    {
+        get { lock (Gate) return GroqClient.NormalizeLanguage(_data.Language); }
+        set { lock (Gate) { _data.Language = GroqClient.NormalizeLanguage(value); Save(); } }
     }
 
     /// <summary>Whether to fix vocabulary terms via the Groq LLM after transcription (spec §6.1, opt-in).</summary>
