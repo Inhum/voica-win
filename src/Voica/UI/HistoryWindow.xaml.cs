@@ -41,6 +41,46 @@ public partial class HistoryWindow : Window
             rows.Add(new Row { Item = t });
         Grid.ItemsSource = rows;
         StatusText.Text = rows.Count == 0 ? S.HistEmpty : string.Format(S.HistCountFmt, rows.Count);
+        ExportButton.IsEnabled = rows.Count > 0;   // spec §7: disabled on an empty history
+    }
+
+    /// <summary>Exports the whole history to Markdown / CSV / JSON (spec §7); audio is not included.</summary>
+    private void OnExport(object sender, RoutedEventArgs e)
+    {
+        var records = Store.Shared.All();
+        if (records.Count == 0) return;
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = S.ExportTitle,
+            Filter = S.ExportFilters,
+            FilterIndex = 1,                      // Markdown by default
+            AddExtension = true,
+            DefaultExt = ".md",
+            FileName = HistoryExport.SuggestedFileName(ExportFormat.Markdown),
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        // The chosen filter decides the format, so switching it in the dialog switches the output.
+        var format = dialog.FilterIndex switch
+        {
+            2 => ExportFormat.Csv,
+            3 => ExportFormat.Json,
+            _ => ExportFormat.Markdown,
+        };
+
+        try
+        {
+            var content = HistoryExport.Render(records, format);
+            File.WriteAllText(dialog.FileName, content, HistoryExport.EncodingFor(format));
+            StatusText.Text = string.Format(S.ExportDoneFmt, records.Count);
+            Log.Info($"history exported: {records.Count} records → {format}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("history export failed", ex);
+            StatusText.Text = string.Format(S.ExportFailedFmt, ex.Message);
+        }
     }
 
     private Transcription? Selected => (Grid.SelectedItem as Row)?.Item;

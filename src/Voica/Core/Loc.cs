@@ -186,6 +186,13 @@ public static class S
     public static string BtnPlay => Loc.T("Play", "Играть");
     public static string BtnDelete => Loc.T("Delete", "Удалить");
     public static string BtnRefresh => Loc.T("Refresh", "Обновить");
+    public static string BtnExport => Loc.T("Export…", "Экспорт…");
+    public static string ExportTitle => Loc.T("Export history", "Экспорт истории");
+    public static string ExportFilters => Loc.T(
+        "Markdown (*.md)|*.md|CSV (*.csv)|*.csv|JSON (*.json)|*.json",
+        "Markdown (*.md)|*.md|CSV (*.csv)|*.csv|JSON (*.json)|*.json");
+    public static string ExportDoneFmt => Loc.T("Exported {0} record(s).", "Экспортировано записей: {0}.");
+    public static string ExportFailedFmt => Loc.T("Export failed: {0}", "Ошибка экспорта: {0}");
     public static string HistEmpty => Loc.T("No transcriptions yet.", "Пока нет расшифровок.");
     public static string HistCountFmt => Loc.T("{0} transcription(s).", "Записей: {0}.");
     public static string HistCopied => Loc.T("Copied to clipboard.", "Скопировано в буфер.");

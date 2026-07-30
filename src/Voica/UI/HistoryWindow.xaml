@@ -34,6 +34,8 @@
             <Button x:Name="PlayButton" Content="{x:Static l:S.BtnPlay}" Width="90" Height="28" Margin="0,0,8,0" Click="OnPlay" />
             <Button x:Name="DeleteButton" Content="{x:Static l:S.BtnDelete}" Width="90" Height="28" Margin="0,0,8,0" Click="OnDelete" />
             <Button Content="{x:Static l:S.BtnRefresh}" Width="90" Height="28" Margin="0,0,8,0" Click="OnRefresh" />
+            <!-- Whole-history action (spec §7), separate from the per-record buttons above. -->
+            <Button x:Name="ExportButton" Content="{x:Static l:S.BtnExport}" Width="90" Height="28" Margin="16,0,8,0" Click="OnExport" />
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
         </StackPanel>
     </Grid>

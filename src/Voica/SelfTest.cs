@@ -174,6 +174,44 @@ public static class SelfTest
         Check("groq network-error flag",
             new GroqException("x", isNetworkError: true).IsNetworkError && !new GroqException("y").IsNetworkError);
 
+        // --- History export (spec §7) ---
+        var exportRecords = new[]
+        {
+            new Transcription(2, DateTimeOffset.FromUnixTimeSeconds(1_800_000_000), "Привет, \"мир\"", "Russian", 2.5, null, "whisper-large-v3-turbo"),
+            new Transcription(1, DateTimeOffset.FromUnixTimeSeconds(1_700_000_000), "Line, with comma", null, null, "a.wav", null),
+        };
+        Check("export extensions",
+            HistoryExport.Extension(ExportFormat.Markdown) == ".md"
+            && HistoryExport.Extension(ExportFormat.Csv) == ".csv"
+            && HistoryExport.Extension(ExportFormat.Json) == ".json");
+
+        var md = HistoryExport.Render(exportRecords, ExportFormat.Markdown);
+        Check("export markdown structure",
+            md.StartsWith("# Voica — history (2)") && md.Contains("## ")
+            && md.Contains("_Russian · 2.5s · whisper-large-v3-turbo_") && md.Contains("Привет, \"мир\""));
+
+        var csv = HistoryExport.Render(exportRecords, ExportFormat.Csv);
+        Check("export csv header and escaping",
+            csv.StartsWith("created_at,text,language,duration_sec,model\r\n")
+            && csv.Contains("\"Привет, \"\"мир\"\"\"")          // quote + comma → quoted, quotes doubled
+            && csv.Contains("\"Line, with comma\"")
+            && csv.Contains(",2.50,"));
+        Check("export csv encoding has BOM",
+            HistoryExport.EncodingFor(ExportFormat.Csv).GetPreamble().Length == 3
+            && HistoryExport.EncodingFor(ExportFormat.Markdown).GetPreamble().Length == 0);
+
+        var json = HistoryExport.Render(exportRecords, ExportFormat.Json);
+        Check("export json fields and omission",
+            json.Contains("\"created_at\"") && json.Contains("\"duration_sec\": 2.5")
+            && json.Contains("\"audio_filename\": \"a.wav\"")
+            && !json.Contains("\"language\": null") && json.Contains("Привет"));
+        Check("export json keys sorted",
+            json.IndexOf("\"created_at\"", StringComparison.Ordinal) < json.IndexOf("\"id\"", StringComparison.Ordinal)
+            && json.IndexOf("\"id\"", StringComparison.Ordinal) < json.IndexOf("\"text\"", StringComparison.Ordinal));
+        Check("export suggested filename",
+            HistoryExport.SuggestedFileName(ExportFormat.Json).StartsWith("voica-history-")
+            && HistoryExport.SuggestedFileName(ExportFormat.Json).EndsWith(".json"));
+
         // --- Updater version comparison (spec §10) ---
         Check("update normalize v-prefix", Updater.Normalize("v0.5.0") == "0.5.0");
         Check("update isNewer patch", Updater.IsNewer("0.4.1", "0.4.0"));
@@ -293,12 +331,14 @@ public static class SelfTest
         Check("store keeps audio when enabled",
             keepRow?.AudioPath is not null && File.Exists(keepRow.AudioPath));
 
-        int purged = Store.Shared.PurgeAudioOlderThan(DateTimeOffset.UtcNow.AddDays(1));
+        // Retention must NOT be exercised with a future cutoff here: this runs against the real
+        // database, and that would delete every stored recording the user owns. Only verify that a
+        // past cutoff is a no-op; the destructive path is covered by the app's launch cleanup.
+        int purged = Store.Shared.PurgeAudioOlderThan(DateTimeOffset.FromUnixTimeSeconds(0));
         var keepRow2 = keepId is null ? null : Store.Shared.All().FirstOrDefault(t => t.Id == keepId.Value);
-        Check("retention clears audio but keeps text",
-            purged >= 1 && keepRow2 is not null && keepRow2.AudioFilename is null
-            && keepRow2.Text == "__voica_audio_selftest__" && !File.Exists(keepWav));
-        if (keepId is not null) Store.Shared.Delete(keepId.Value);
+        Check("retention past cutoff is a no-op",
+            purged == 0 && keepRow2?.AudioFilename is not null && File.Exists(keepWav));
+        if (keepId is not null) Store.Shared.Delete(keepId.Value);   // also removes its audio file
 
         Prefs.StoreAudio = false;
         var dropWav = Path.Combine(Paths.AudioDir, $"rec-selftest-{Guid.NewGuid():N}.wav");
