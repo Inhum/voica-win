@@ -133,6 +133,15 @@ public static class S
         "После распознавания искажённые термины из словаря исправляет chat-модель Groq. Словарь задаёт каноническое написание (включая регистр). Работает только при непустом словаре; при сбое доставляется исходный текст.");
     public static string LlmChecking => Loc.T("Checking model availability…", "Проверка доступности модели…");
     public static string LlmAvailable => Loc.T("✓ Model is available.", "✓ Модель доступна.");
+    public static string LlmAvailableFmt => Loc.T("✓ Model is available: {0}", "✓ Модель доступна: {0}");
+    public static string LlmSwitchedFmt => Loc.T(
+        "Selected model is unavailable — switched to {0}.",
+        "Выбранная модель недоступна — переключились на {0}.");
+    public static string LlmNoModels => Loc.T(
+        "No suitable chat model is available for this key.",
+        "Для этого ключа нет подходящей chat-модели.");
+    public static string LblChatModel => Loc.T("Correction model", "Модель исправления");
+    public static string ChatModelAuto => Loc.T("Recommended (automatic)", "Рекомендуемая (автоматически)");
     public static string LlmUnavailableFmt => Loc.T("✗ {0}", "✗ {0}");
     public static string LlmBlockedFmt => Loc.T(
         "Model {0} is blocked for your Groq org. Allow it at console.groq.com → Settings → Limits.",

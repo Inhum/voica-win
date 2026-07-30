@@ -99,6 +99,11 @@
                     <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" Margin="0,0,0,4"
                               Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
                     <TextBlock x:Name="LlmStatusText" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <!-- Model picker: only meaningful while AI correction is on (spec §6.1). -->
+                    <StackPanel x:Name="ChatModelPanel" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">
+                        <TextBlock Text="{x:Static l:S.LblChatModel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="ChatModelCombo" Width="300" SelectionChanged="OnChatModelChanged" />
+                    </StackPanel>
                     <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.LlmHint}" />
                 </StackPanel>
             </TabItem>

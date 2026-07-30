@@ -54,6 +54,7 @@ public partial class SettingsWindow : Window
         UpdateVocabCounter();
         LlmCheck.IsChecked = Prefs.LlmPostProcess;
         LlmStatusText.Text = "";
+        ChatModelPanel.Visibility = Prefs.LlmPostProcess ? Visibility.Visible : Visibility.Collapsed;
 
         // Prefill the saved key (masked) so "Show" can reveal it, like the macOS app.
         KeyBox.Password = KeyStore.Load() ?? "";
@@ -247,11 +248,25 @@ public partial class SettingsWindow : Window
         if (!_loaded) return;
         Prefs.LlmPostProcess = LlmCheck.IsChecked == true;
         LlmStatusText.Text = "";
+        ChatModelPanel.Visibility = Prefs.LlmPostProcess ? Visibility.Visible : Visibility.Collapsed;
         if (Prefs.LlmPostProcess)
             _ = ProbeChatModelAsync();
     }
 
-    /// <summary>Non-blocking availability probe of the chat model (spec §6.1 UX).</summary>
+    private void OnChatModelChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || ChatModelCombo.SelectedIndex < 0) return;
+        // Index 0 is "Recommended (automatic)"; the rest are live model ids.
+        Prefs.ChatModel = ChatModelCombo.SelectedIndex == 0
+            ? ChatModels.Auto
+            : (string)ChatModelCombo.Items[ChatModelCombo.SelectedIndex];
+        _ = ProbeChatModelAsync();
+    }
+
+    /// <summary>
+    /// Refreshes the live model list, re-resolves (self-healing) and probes the resolved model
+    /// (spec §6.1 UX). Never blocks the UI.
+    /// </summary>
     private async System.Threading.Tasks.Task ProbeChatModelAsync()
     {
         var key = KeyStore.Load();
@@ -264,17 +279,39 @@ public partial class SettingsWindow : Window
 
         LlmStatusText.Text = S.LlmChecking;
         LlmStatusText.Foreground = System.Windows.SystemColors.GrayTextBrush;
-        var problem = await GroqClient.ValidateChatModelAsync(key);
-        if (problem is null)
+
+        var check = await GroqClient.CheckChatModelAsync(key);
+        if (check.Available)
         {
-            LlmStatusText.Text = S.LlmAvailable;
-            LlmStatusText.Foreground = System.Windows.Media.Brushes.Green;
+            LlmStatusText.Text = check.Switched
+                ? string.Format(S.LlmSwitchedFmt, check.Model)
+                : string.Format(S.LlmAvailableFmt, check.Model);
+            LlmStatusText.Foreground = check.Switched
+                ? System.Windows.Media.Brushes.DarkOrange
+                : System.Windows.Media.Brushes.Green;
         }
         else
         {
-            LlmStatusText.Text = string.Format(S.LlmUnavailableFmt, problem);
+            LlmStatusText.Text = string.Format(S.LlmUnavailableFmt, check.Problem);
             LlmStatusText.Foreground = System.Windows.Media.Brushes.Firebrick;
         }
+
+        await RefreshChatModelListAsync(key);
+    }
+
+    /// <summary>Fills the picker with "auto" + the live chat models, selecting the current choice.</summary>
+    private async System.Threading.Tasks.Task RefreshChatModelListAsync(string key)
+    {
+        var ids = ChatModels.FilterChatModels(await GroqClient.ListModelsAsync(key)).OrderBy(x => x).ToList();
+        var items = new List<string> { S.ChatModelAuto };
+        items.AddRange(ids);
+
+        var wasLoaded = _loaded;
+        _loaded = false;
+        ChatModelCombo.ItemsSource = items;
+        var chosen = Prefs.ChatModel;
+        ChatModelCombo.SelectedIndex = chosen == ChatModels.Auto ? 0 : Math.Max(0, items.IndexOf(chosen));
+        _loaded = wasLoaded;
     }
 
     // --- Groq API key (Save-gated) ---

@@ -48,9 +48,7 @@ public static class GroqClient
     /// <summary>Falls back to "auto" when a stored language is unknown (spec §2).</summary>
     public static string NormalizeLanguage(string? language) =>
         Array.Exists(Languages, l => l == language) ? language! : "auto";
-    // Spec §6.1. Groq periodically removes/renames models (qwen/qwen3-32b vanished → 404), so the
-    // availability probe must distinguish 404 (update the app) from 403 (blocked in the Groq org).
-    public const string PostProcessModel = "llama-3.3-70b-versatile";
+    // Spec §6.1: the chat model is resolved dynamically from the live model list — see ChatModels.
     public const int PromptCharBudget = 800;
 
     public static readonly Uri Endpoint = new("https://api.groq.com/openai/v1/audio/transcriptions");
@@ -178,10 +176,40 @@ public static class GroqClient
             $"ТЕКСТ: {text}";
     }
 
+    /// <summary>Lists model ids the key can see (spec §6.1). Empty on any failure.</summary>
+    public static async Task<IReadOnlyList<string>> ListModelsAsync(string apiKey, CancellationToken cancellationToken = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(ValidateTimeout);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, ModelsEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
+            if (!response.IsSuccessStatusCode) return Array.Empty<string>();
+
+            var body = await response.Content.ReadAsStringAsync(cts.Token);
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("data", out var data)) return Array.Empty<string>();
+
+            var ids = new List<string>();
+            foreach (var item in data.EnumerateArray())
+                if (item.TryGetProperty("id", out var idEl) && idEl.GetString() is { } id)
+                    ids.Add(id);
+            return ids;
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     /// <summary>
     /// Corrects mangled vocabulary terms via the Groq chat model (spec §6.1). Fail-open: on any
     /// error/timeout/non-2xx/empty answer the ORIGINAL text is returned — post-processing never
-    /// blocks dictation.
+    /// blocks dictation. A 404 (model retired by Groq) re-resolves the model and retries once, so
+    /// the app heals itself without a release.
     /// </summary>
     public static async Task<string> PostProcessAsync(string text, string apiKey, string? vocabulary,
         CancellationToken cancellationToken = default)
@@ -189,66 +217,116 @@ public static class GroqClient
         var prompt = PostProcessPromptText(text, vocabulary);
         if (prompt is null) return text;
 
+        var (result, notFound) = await TryPostProcessAsync(text, apiKey, prompt, Prefs.ActiveChatModel, cancellationToken);
+        if (!notFound) return result;
+
+        // Model gone → refresh the resolution and retry once with whatever is available now.
+        Log.Info("chat model returned 404 — re-resolving");
+        var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
+        if (resolved is null || resolved == Prefs.ActiveChatModel) return text;
+
+        var (retry, _) = await TryPostProcessAsync(text, apiKey, prompt, resolved, cancellationToken);
+        return retry;
+    }
+
+    private static async Task<(string Text, bool NotFound)> TryPostProcessAsync(
+        string text, string apiKey, string prompt, string model, CancellationToken cancellationToken)
+    {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(PostProcessTimeout);
 
         try
         {
-            using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096);
+            using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096, model);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
-            if (!response.IsSuccessStatusCode) return text;
+            if (!response.IsSuccessStatusCode)
+                return (text, (int)response.StatusCode == 404);
 
             var body = await response.Content.ReadAsStringAsync(cts.Token);
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
-                return text;
+                return (text, false);
             var content = choices[0].GetProperty("message").GetProperty("content").GetString();
             var cleaned = (content ?? string.Empty).Trim();
-            return cleaned.Length == 0 ? text : cleaned;
+            return (cleaned.Length == 0 ? text : cleaned, false);
         }
         catch
         {
-            return text;   // fail-open (spec §6.1)
+            return (text, false);   // fail-open (spec §6.1)
         }
     }
 
     /// <summary>
-    /// Probes the chat model's availability for AI correction (spec §6.1 UX). Null = available;
-    /// otherwise a user-facing description (403 → "allow the model in the Groq console" hint).
+    /// Re-resolves the chat model from the live list and caches it (spec §6.1 self-healing).
+    /// Silently drops an explicit choice that no longer exists. Null when nothing usable is available.
     /// </summary>
-    public static async Task<string?> ValidateChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
+    public static async Task<string?> ResolveAndCacheChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
     {
+        var available = await ListModelsAsync(apiKey, cancellationToken);
+        if (available.Count == 0) return null;
+
+        if (ChatModels.ChoiceRetired(available, Prefs.ChatModel))
+        {
+            Log.Info($"chosen chat model '{Prefs.ChatModel}' is gone — falling back to auto");
+            Prefs.ChatModel = ChatModels.Auto;
+        }
+
+        var resolved = ChatModels.Resolve(available, Prefs.ChatModel);
+        if (resolved is not null) Prefs.ResolvedChatModel = resolved;
+        return resolved;
+    }
+
+    /// <summary>Outcome of the chat-model check shown in Settings (spec §6.1 UX).</summary>
+    public sealed record ChatModelCheck(bool Available, string? Model, string? Problem, bool Switched);
+
+    /// <summary>
+    /// Refreshes the model list, re-resolves (self-healing), and probes the resolved model
+    /// (spec §6.1): distinguishes 403 (blocked for the org) from other failures.
+    /// </summary>
+    public static async Task<ChatModelCheck> CheckChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
+    {
+        var before = Prefs.ActiveChatModel;
+        var available = await ListModelsAsync(apiKey, cancellationToken);
+        if (available.Count == 0)
+            return new ChatModelCheck(false, null, S.LlmNoModels, false);
+
+        var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
+        if (resolved is null)
+            return new ChatModelCheck(false, null, S.LlmNoModels, false);
+
+        bool switched = resolved != before;
+
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(ChatProbeTimeout);
-
         try
         {
-            using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8);
+            using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8, resolved);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            return (int)response.StatusCode switch
+            var problem = (int)response.StatusCode switch
             {
                 >= 200 and < 300 => null,
-                403 => string.Format(S.LlmBlockedFmt, PostProcessModel),
-                404 => string.Format(S.LlmNotFoundFmt, PostProcessModel),
+                403 => string.Format(S.LlmBlockedFmt, resolved),
+                404 => string.Format(S.LlmNotFoundFmt, resolved),
                 401 => S.KeyValidRejected,
                 var code => $"HTTP {code}",
             };
+            return new ChatModelCheck(problem is null, resolved, problem, switched);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return S.KeyValidTimeout;
+            return new ChatModelCheck(false, resolved, S.KeyValidTimeout, switched);
         }
         catch (HttpRequestException ex)
         {
-            return ex.Message;
+            return new ChatModelCheck(false, resolved, ex.Message, switched);
         }
     }
 
-    private static HttpRequestMessage BuildChatRequest(string apiKey, string userContent, int maxCompletionTokens)
+    private static HttpRequestMessage BuildChatRequest(string apiKey, string userContent, int maxCompletionTokens, string model)
     {
         var payload = new
         {
-            model = PostProcessModel,
+            model,
             temperature = 0,
             max_completion_tokens = maxCompletionTokens,
             messages = new[] { new { role = "user", content = userContent } },

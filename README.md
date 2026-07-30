@@ -167,11 +167,13 @@ Each user gets a free key at [console.groq.com](https://console.groq.com); usage
 to [Groq's Terms of Use](https://groq.com/terms-of-use). Free-tier limits (whisper-large-v3-turbo):
 20 req/min, 2000/day, 7200 audio-seconds/hour — far more than dictation needs.
 
-**If you enable AI term correction** (Settings → Vocabulary), Voica also calls the chat model
-`qwen/qwen3-32b`. If your Groq organization restricts model access, allow this model at
-console.groq.com → Settings → Limits — otherwise the correction silently falls back to the
-raw transcription (fail-open by design). Settings shows a model-availability check next to
-the toggle.
+**If you enable AI term correction** (Settings → Vocabulary), Voica also calls a Groq **chat
+model**. The model isn't hardcoded: Voica reads the live model list for your key and picks the
+best available one (by default `llama-3.3-70b-versatile`, falling back through other families) —
+so when Groq retires or renames a model, the app heals itself instead of needing an update. You
+can also pin a specific model in the picker next to the toggle. If your Groq organization
+restricts model access, allow the chosen model at console.groq.com → Settings → Limits;
+otherwise the correction silently falls back to the raw transcription (fail-open by design).
 
 ## Build from source
 

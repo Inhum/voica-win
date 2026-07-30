@@ -72,8 +72,37 @@ public static class SelfTest
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
         // --- LLM post-processing prompt (spec §6.1) ---
-        Check("postprocess model", GroqClient.PostProcessModel == "llama-3.3-70b-versatile");
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
+
+        // --- Dynamic chat-model resolution / self-healing (spec §6.1) ---
+        Check("chat denylist filters non-chat",
+            !ChatModels.IsChatModel("whisper-large-v3") && !ChatModels.IsChatModel("playai-tts")
+            && !ChatModels.IsChatModel("meta-llama/llama-guard-4-12b")
+            && !ChatModels.IsChatModel("distil-whisper-large-v3-en")
+            && ChatModels.IsChatModel("llama-3.3-70b-versatile"));
+        Check("chat resolve prefers priority chain",
+            ChatModels.Resolve(new[] { "gemma2-9b-it", "openai/gpt-oss-20b", "llama-3.3-70b-versatile" }, ChatModels.Auto)
+                == "llama-3.3-70b-versatile");
+        Check("chat resolve honours explicit choice",
+            ChatModels.Resolve(new[] { "gemma2-9b-it", "llama-3.3-70b-versatile" }, "gemma2-9b-it") == "gemma2-9b-it");
+        Check("chat resolve drops retired choice",
+            ChatModels.Resolve(new[] { "gemma2-9b-it" }, "qwen/qwen3-32b") == "gemma2-9b-it");
+        Check("chat resolve falls back to first live",
+            ChatModels.Resolve(new[] { "some-new-model" }, ChatModels.Auto) == "some-new-model");
+        Check("chat resolve null when nothing usable",
+            ChatModels.Resolve(new[] { "whisper-large-v3", "playai-tts" }, ChatModels.Auto) is null);
+        Check("chat choiceRetired detects gone model",
+            ChatModels.ChoiceRetired(new[] { "gemma2-9b-it" }, "llama-3.3-70b-versatile")
+            && !ChatModels.ChoiceRetired(new[] { "gemma2-9b-it" }, ChatModels.Auto));
+
+        var savedChat = Prefs.ChatModel; var savedResolved = Prefs.ResolvedChatModel;
+        Prefs.ChatModel = "gemma2-9b-it";
+        Check("prefs chatModel round-trip and active", Prefs.ChatModel == "gemma2-9b-it" && Prefs.ActiveChatModel == "gemma2-9b-it");
+        Prefs.ChatModel = "qwen/qwen3-32b";   // retired → migrated to auto on read
+        Check("prefs migrates retired chat model", Prefs.ChatModel == ChatModels.Auto);
+        Prefs.ChatModel = ChatModels.Auto; Prefs.ResolvedChatModel = "openai/gpt-oss-120b";
+        Check("prefs active uses cached resolution", Prefs.ActiveChatModel == "openai/gpt-oss-120b");
+        Prefs.ChatModel = savedChat; Prefs.ResolvedChatModel = savedResolved;
         Check("postprocess prompt null on empty vocab",
             GroqClient.PostProcessPromptText("текст", "  \n ") is null);
         var ppPrompt = GroqClient.PostProcessPromptText("привет кубер стил", "kubectl, Kubernetes");

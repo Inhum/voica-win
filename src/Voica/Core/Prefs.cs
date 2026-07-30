@@ -34,6 +34,8 @@ public static class Prefs
         public long LastUpdateCheckUnix { get; set; } = 0;       // 0 = never
         public string Vocabulary { get; set; } = "";             // spec §6
         public bool LlmPostProcess { get; set; } = false;        // spec §6.1, opt-in
+        public string ChatModel { get; set; } = ChatModels.Auto;         // spec §6.1: "auto" | model id
+        public string ResolvedChatModel { get; set; } = ChatModels.Seed; // cached resolution
         public string Engine { get; set; } = "cloud";            // spec §2.5: "cloud" | "local"
         public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
         public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
@@ -156,6 +158,51 @@ public static class Prefs
     {
         get { lock (Gate) return _data.LlmPostProcess; }
         set { lock (Gate) { _data.LlmPostProcess = value; Save(); } }
+    }
+
+    /// <summary>
+    /// Chat model for AI term correction (spec §6.1): <c>"auto"</c> (default) or an explicit id.
+    /// Models Groq has retired are migrated back to "auto" on read.
+    /// </summary>
+    public static string ChatModel
+    {
+        get
+        {
+            lock (Gate)
+            {
+                var v = _data.ChatModel;
+                if (string.IsNullOrWhiteSpace(v) || RetiredChatModels.Contains(v)) return ChatModels.Auto;
+                return v;
+            }
+        }
+        set { lock (Gate) { _data.ChatModel = string.IsNullOrWhiteSpace(value) ? ChatModels.Auto : value; Save(); } }
+    }
+
+    /// <summary>Models Groq has withdrawn; a saved choice pointing at one falls back to "auto".</summary>
+    private static readonly string[] RetiredChatModels = { "qwen/qwen3-32b" };
+
+    /// <summary>Last successfully resolved chat model — used offline and on first run (spec §6.1).</summary>
+    public static string ResolvedChatModel
+    {
+        get
+        {
+            lock (Gate)
+            {
+                var v = _data.ResolvedChatModel;
+                return string.IsNullOrWhiteSpace(v) || RetiredChatModels.Contains(v) ? ChatModels.Seed : v;
+            }
+        }
+        set { lock (Gate) { _data.ResolvedChatModel = value; Save(); } }
+    }
+
+    /// <summary>The model actually sent to Groq: an explicit choice, else the cached resolution.</summary>
+    public static string ActiveChatModel
+    {
+        get
+        {
+            var chosen = ChatModel;
+            return chosen == ChatModels.Auto ? ResolvedChatModel : chosen;
+        }
     }
 
     /// <summary>Whether to show the "Inserted" balloon after a successful insert.</summary>
