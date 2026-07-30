@@ -49,6 +49,7 @@ public partial class SettingsWindow : Window
         StoreAudioCheck.IsChecked = Prefs.StoreAudio;
         NotifyInsertCheck.IsChecked = Prefs.NotifyOnInsert;
         CheckUpdatesCheck.IsChecked = Prefs.CheckUpdatesOnLaunch;
+        AboutVersionText.Text = string.Format(S.AboutVersionFmt, AppInfo.Version);
         RetentionBox.Text = Prefs.RetentionDays.ToString();
         VocabularyBox.Text = Prefs.Vocabulary;
         UpdateVocabCounter();
@@ -388,6 +389,66 @@ public partial class SettingsWindow : Window
         KeyStatusText.Text = S.KeySavedNow;
         Log.Info("Groq key saved");
     }
+
+    // --- About tab: version, updates, links (spec §10/§12) ---
+
+    /// <summary>Index of the About tab, for opening Settings straight at it from the tray menu.</summary>
+    public const int AboutTabIndex = 4;
+
+    /// <summary>Selects a tab by index (used by the tray's "About Voica" item).</summary>
+    public void SelectTab(int index)
+    {
+        if (index >= 0 && index < Tabs.Items.Count) Tabs.SelectedIndex = index;
+    }
+
+    private string? _updateUrl;
+
+    private async void OnCheckUpdatesNow(object sender, RoutedEventArgs e)
+    {
+        CheckNowButton.IsEnabled = false;
+        UpdateStatusText.Text = S.LlmChecking;
+        try
+        {
+            var result = await Updater.CheckAsync();
+            Prefs.LastUpdateCheck = DateTime.UtcNow;
+            switch (result.Outcome)
+            {
+                case UpdateOutcome.Available:
+                    _updateUrl = result.Url;
+                    DownloadUpdateButton.Content = string.Format(S.BtnDownloadUpdateFmt, result.Version);
+                    DownloadUpdateButton.Visibility = Visibility.Visible;
+                    UpdateStatusText.Text = string.Format(S.UpdateAvailableAskFmt, result.Version);
+                    break;
+                case UpdateOutcome.UpToDate:
+                    UpdateStatusText.Text = string.Format(S.UpdateUpToDateFmt, AppInfo.Version);
+                    break;
+                case UpdateOutcome.NoRelease:
+                    UpdateStatusText.Text = S.UpdateNoReleases;
+                    break;
+                default:
+                    UpdateStatusText.Text = string.Format(S.UpdateErrorFmt, result.Message);
+                    break;
+            }
+        }
+        finally
+        {
+            CheckNowButton.IsEnabled = true;
+        }
+    }
+
+    private void OnOpenUpdatePage(object sender, RoutedEventArgs e)
+    {
+        if (_updateUrl is not null) OpenUrl(_updateUrl);
+    }
+
+    private void OnNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        OpenUrl(e.Uri.AbsoluteUri);
+        e.Handled = true;
+    }
+
+    private static void OpenUrl(string url) =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
 
     // --- Reset settings (spec §11): keeps key, history, audio, and vocabulary ---
 

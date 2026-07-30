@@ -20,7 +20,6 @@ public sealed class TrayIconController : IDisposable
     private DictationController? _controller;
     private HistoryWindow? _historyWindow;
     private SettingsWindow? _settingsWindow;
-    private AboutWindow? _aboutWindow;
     private MenuItem? _updateMenuItem;
     private string? _updateUrl;
 
@@ -112,7 +111,7 @@ public sealed class TrayIconController : IDisposable
         window.Activate();
     }
 
-    private void OpenSettings()
+    private void OpenSettings(int? tabIndex = null)
     {
         if (_settingsWindow is null)
         {
@@ -120,6 +119,7 @@ public sealed class TrayIconController : IDisposable
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
         }
+        if (tabIndex is { } index) _settingsWindow.SelectTab(index);
         _settingsWindow.Activate();
     }
 
@@ -137,16 +137,8 @@ public sealed class TrayIconController : IDisposable
         }
     }
 
-    private void OpenAbout()
-    {
-        if (_aboutWindow is null)
-        {
-            _aboutWindow = new AboutWindow();
-            _aboutWindow.Closed += (_, _) => _aboutWindow = null;
-            _aboutWindow.Show();
-        }
-        _aboutWindow.Activate();
-    }
+    /// <summary>About lives as a Settings tab now (parity with macOS) — open Settings there.</summary>
+    private void OpenAbout() => OpenSettings(SettingsWindow.AboutTabIndex);
 
     // --- Updates (spec §10) ---
 

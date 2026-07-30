@@ -11,7 +11,7 @@
             <Button Content="{x:Static l:S.BtnClose}" HorizontalAlignment="Right" Width="90" Height="28" IsCancel="True" Click="OnClose" />
         </Grid>
 
-        <TabControl>
+        <TabControl x:Name="Tabs">
             <!-- ============ General: engine · API key · updates · reset (spec §2.5/§9/§10/§11) ============ -->
             <TabItem Header="{x:Static l:S.TabGeneral}">
                 <StackPanel Margin="12">
@@ -39,11 +39,6 @@
                         <Button x:Name="SaveKeyButton" Content="{x:Static l:S.BtnSave}" Width="76" Height="26" Click="OnSaveKey" />
                     </StackPanel>
                     <TextBlock x:Name="KeyStatusText" Margin="0,6,0,0" Opacity="0.8" TextWrapping="Wrap" />
-
-                    <Separator Margin="0,12" />
-
-                    <CheckBox x:Name="CheckUpdatesCheck" Content="{x:Static l:S.ChkCheckUpdates}" Margin="0,2"
-                              Checked="OnCheckUpdatesChanged" Unchecked="OnCheckUpdatesChanged" />
 
                     <Separator Margin="0,12" />
 
@@ -132,6 +127,45 @@
 
                     <Button Content="{x:Static l:S.BtnDeleteAll}" Width="150" Height="28"
                             HorizontalAlignment="Left" Foreground="#C0392B" Click="OnDeleteAllData" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ About: version · privacy · updates · links (spec §10/§12) ============ -->
+            <TabItem Header="{x:Static l:S.TabAbout}">
+                <StackPanel Margin="12">
+                    <StackPanel Orientation="Horizontal">
+                        <Image Source="pack://application:,,,/Resources/voica-app.png" Width="56" Height="56"
+                               RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
+                        <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Voica" FontSize="20" FontWeight="Bold" />
+                            <TextBlock x:Name="AboutVersionText" Opacity="0.75" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Text="{x:Static l:S.AboutTagline}" />
+                    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Opacity="0.8" Text="{x:Static l:S.AboutPrivacy}" />
+
+                    <Separator Margin="0,12" />
+
+                    <TextBlock Text="{x:Static l:S.LblUpdates}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="CheckNowButton" Content="{x:Static l:S.BtnCheckNow}" Width="120" Height="26"
+                                Click="OnCheckUpdatesNow" />
+                        <Button x:Name="DownloadUpdateButton" Width="170" Height="26" Margin="8,0,0,0"
+                                Visibility="Collapsed" Click="OnOpenUpdatePage" />
+                        <TextBlock x:Name="UpdateStatusText" VerticalAlignment="Center" Margin="10,0,0,0" Opacity="0.8" />
+                    </StackPanel>
+                    <CheckBox x:Name="CheckUpdatesCheck" Content="{x:Static l:S.ChkCheckUpdates}" Margin="0,10,0,0"
+                              Checked="OnCheckUpdatesChanged" Unchecked="OnCheckUpdatesChanged" />
+
+                    <Separator Margin="0,12" />
+
+                    <TextBlock>
+                        <Hyperlink NavigateUri="https://github.com/Inhum/voica-win" RequestNavigate="OnNavigate">
+                            <Run Text="{x:Static l:S.BtnGitHub}" />
+                        </Hyperlink>
+                    </TextBlock>
+                    <TextBlock Margin="0,8,0,0" Opacity="0.6" FontSize="11" Text="{x:Static l:S.AboutLicense}" />
                 </StackPanel>
             </TabItem>
         </TabControl>

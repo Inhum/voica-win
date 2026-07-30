@@ -90,6 +90,12 @@ public static class S
     public static string TabDictation => Loc.T("Dictation", "Диктовка");
     public static string TabVocabulary => Loc.T("Vocabulary", "Словарь");
     public static string TabData => Loc.T("Data", "Данные");
+    public static string TabAbout => Loc.T("About", "О программе");
+    public static string LblUpdates => Loc.T("Updates", "Обновления");
+    public static string BtnCheckNow => Loc.T("Check now", "Проверить сейчас");
+    public static string BtnDownloadUpdateFmt => Loc.T("Download {0}", "Скачать {0}");
+    public static string BtnGitHub => Loc.T("GitHub", "GitHub");
+    public static string AboutLicense => "© 2026 Ivan Ushakov · MIT License";
     public static string ModelDiskFmt => Loc.T("On disk: {0} MB.", "На диске: {0} МБ.");
     public static string LblDictationMode => Loc.T("Dictation mode", "Режим диктовки");
     public static string ModePtt => Loc.T("Push-to-talk (hold)", "Push-to-talk (удержание)");
