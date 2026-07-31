@@ -4,12 +4,31 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-07-30
+
+### Added
+- **STT model and language choice** for the cloud engine (spec §2, Settings → Dictation):
+  `whisper-large-v3-turbo` (default) or `whisper-large-v3`, and auto-detect / Russian / English.
+  Forcing a language fixes short phrases that auto-detect gets wrong. History records the model
+  actually used.
+- **Dynamic chat-model resolution with self-healing** for AI term correction (spec §6.1): the
+  model is no longer hardcoded — Voica reads the live model list, picks the best available one by
+  a priority chain, caches it, migrates retired choices, and re-resolves on a 404 mid-dictation.
+  Settings shows the resolved model and offers a picker.
+- **History export** to Markdown, CSV or JSON (spec §7) — the whole history, text and metadata,
+  no audio. CSV carries a UTF-8 BOM for Excel.
+- **About is now a Settings tab** (parity with macOS), together with the updates block:
+  "Check now", a download button, and the check-on-launch toggle.
 
 ### Changed
 - Local engine: adjacent 25 s chunks now overlap by 2 s and the transcripts are stitched with
   seam de-duplication, so a word (and its punctuation) at a chunk boundary in long recordings is
   no longer split or lost. Falls back to a plain join when no overlap is detected.
+- A transcription blocked for your Groq org (HTTP 403) now explains which model to allow.
+
+### Fixed
+- Self-test no longer runs the retention purge with a future cutoff against the real database,
+  which could delete stored recordings.
 
 ### Internal
 - CI: bumped `actions/checkout` and `actions/setup-dotnet` to v5 (removes the Node 20 deprecation
@@ -90,6 +109,7 @@ All notable changes to this project are documented here. The format is based on
 - English/Russian localization by system language.
 - `--test-all` self‑test (no GUI/network) and a `windows-latest` CI workflow.
 
+[0.5.0]: https://github.com/Inhum/voica-win/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Inhum/voica-win/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Inhum/voica-win/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Inhum/voica-win/releases/tag/v0.3.0

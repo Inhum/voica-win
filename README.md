@@ -31,14 +31,15 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
 - **Global hotkey dictation** — Push‑to‑talk (hold) or Toggle (press to start/stop). Default:
   **Toggle + Right Alt**. Pick a preset key (Right/Left Alt, CapsLock, ScrollLock, Pause) or record
   a **custom combination** (e.g. `Ctrl+Shift+Space`).
-- **Punctuation via Groq Whisper** (`whisper-large-v3-turbo`) — auto language detection (great for
-  mixed Russian/English).
+- **Punctuation via Groq Whisper** — pick the model (`whisper-large-v3-turbo` or `whisper-large-v3`)
+  and the language (auto‑detect, great for mixed Russian/English, or force Russian/English).
 - **Local offline engine** (optional) — recognition fully on your PC via **GigaAM v3** (Russian,
   with punctuation), no network and no API key. If the cloud is selected but the network is down,
   Voica automatically falls back to the local engine when the model is installed.
 - **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
   the clipboard as a fallback. Or show an editable **result window**.
-- **History** (SQLite) — browse, re‑copy, play the audio, delete.
+- **History** (SQLite) — browse, re‑copy, play the audio, delete, and **export** the whole history
+  to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
 - **Vocabulary** — a hint list of terms/names Whisper often mangles.
@@ -51,19 +52,23 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
 
 ## Screenshots
 
-**Settings** — General (engine + key) and Vocabulary (terms + AI correction):
+**Settings** — five tabs: engine and API key, dictation, vocabulary, data, about.
 
 ![Settings — General](docs/settings-general.png)
 
+![Settings — Dictation](docs/settings-dictation.png)
+
 ![Settings — Vocabulary](docs/settings-vocabulary.png)
 
-**History** — browse, re‑copy, play, delete:
+![Settings — Data](docs/settings-data.png)
+
+![Settings — About](docs/settings-about.png)
+
+**History** — browse, re‑copy, play, delete, export:
 
 ![History window](docs/history.png)
 
-**About**, and the tray icon (idle):
-
-![About window](docs/about.png)
+**Tray icon** (idle):
 
 ![Tray icon](docs/tray.png)
 
