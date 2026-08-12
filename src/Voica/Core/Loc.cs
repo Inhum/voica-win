@@ -95,6 +95,10 @@ public static class S
     public static string BtnCheckNow => Loc.T("Check now", "Проверить сейчас");
     public static string BtnDownloadUpdateFmt => Loc.T("Download {0}", "Скачать {0}");
     public static string BtnGitHub => Loc.T("GitHub", "GitHub");
+    public static string BtnSupport => Loc.T("Support the project", "Поддержать проект");
+    public static string SupportHint => Loc.T(
+        "Voica is free and stays free — every feature, no subscription. Donations are optional.",
+        "Voica бесплатна и останется бесплатной — все функции, без подписки. Донат — по желанию.");
     public static string AboutLicense => "© 2026 Ivan Ushakov · MIT License";
     public static string ModelDiskFmt => Loc.T("On disk: {0} MB.", "На диске: {0} МБ.");
     public static string LblDictationMode => Loc.T("Dictation mode", "Режим диктовки");

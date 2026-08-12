@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
   <img src="https://img.shields.io/badge/built%20with-C%23%20%2F%20.NET%208-512BD4" alt="C# / .NET 8">
   <a href="https://deepwiki.com/Inhum/voica-win"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+  <a href="https://boosty.to/voica"><img src="https://img.shields.io/badge/Boosty-support-F05A2C?logo=boosty&logoColor=white" alt="Support on Boosty"></a>
 </p>
 
 ---
@@ -25,6 +26,12 @@ typing in. Bring your own Groq API key.
 Voica is a tiny background app that lives in the system tray. It's a native Windows
 (C# / .NET 8 / WPF) implementation of [Voica](https://github.com/Inhum/voica) (macOS), and follows
 the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
+
+## Support the project
+
+Voica is free and stays free — every feature, no subscription. If it saves you time, you can
+back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the Windows and the
+[macOS version](https://github.com/Inhum/voica).
 
 ## Features
 
@@ -42,7 +49,9 @@ the same cross‑platform [behavior spec](docs/CORE-SPEC.md).
   to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
-- **Vocabulary** — a hint list of terms/names Whisper often mangles.
+- **Vocabulary** — a hint list of terms/names Whisper often mangles, plus an optional **AI pass**
+  that fixes the ones still garbled. More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md)
+  (in Russian).
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.
 - **Privacy** — no backend, no telemetry. Network is used only for Groq (cloud transcription /

@@ -164,7 +164,13 @@
                         <Hyperlink NavigateUri="https://github.com/Inhum/voica-win" RequestNavigate="OnNavigate">
                             <Run Text="{x:Static l:S.BtnGitHub}" />
                         </Hyperlink>
+                        <Run Text="  ·  " Foreground="Gray" />
+                        <Hyperlink NavigateUri="https://boosty.to/voica" RequestNavigate="OnNavigate">
+                            <Run Text="{x:Static l:S.BtnSupport}" />
+                        </Hyperlink>
                     </TextBlock>
+                    <TextBlock Margin="0,4,0,0" Opacity="0.7" FontSize="11" TextWrapping="Wrap"
+                               Text="{x:Static l:S.SupportHint}" />
                     <TextBlock Margin="0,8,0,0" Opacity="0.6" FontSize="11" Text="{x:Static l:S.AboutLicense}" />
                 </StackPanel>
             </TabItem>
