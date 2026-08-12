@@ -41,6 +41,7 @@ public partial class SettingsWindow : Window
         OutputCombo.SelectedIndex = Prefs.Output == OutputMode.Insert ? 0 : 1;
 
         // Cloud STT model / language (spec §2); order matches GroqClient's arrays.
+        DoubleTapCheck.IsChecked = Prefs.DoubleTapToStart;
         SttModelCombo.ItemsSource = new[] { S.SttTurbo, S.SttLarge };
         SttModelCombo.SelectedIndex = Array.IndexOf(GroqClient.SttModels, Prefs.SttModel);
         LanguageCombo.ItemsSource = new[] { S.LangAuto, S.LangRu, S.LangEn };
@@ -183,6 +184,13 @@ public partial class SettingsWindow : Window
     {
         if (!_loaded) return;
         Prefs.Output = OutputCombo.SelectedIndex == 0 ? OutputMode.Insert : OutputMode.Window;
+    }
+
+    private void OnDoubleTapChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.DoubleTapToStart = DoubleTapCheck.IsChecked == true;
+        _onHotkeyChanged();   // re-applies the hotkey settings live
     }
 
     private void OnSttModelChanged(object sender, SelectionChangedEventArgs e)

@@ -52,6 +52,8 @@ public sealed class DictationController : IDisposable
     {
         _hotkey.Mode = Prefs.Mode;
         _hotkey.Binding = Prefs.Hotkey;
+        _hotkey.DoubleTapToStart = Prefs.DoubleTapToStart;
+        _hotkey.IsIdle = () => _state == DictationState.Idle;
     }
 
     private void OnPttStart()

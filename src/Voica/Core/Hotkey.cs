@@ -28,6 +28,21 @@ public sealed class HotkeyManager : IDisposable
     public DictationMode Mode { get; set; } = DictationMode.Toggle;
     public HotkeyBinding Binding { get; set; } = HotkeyBinding.Default;
 
+    /// <summary>
+    /// Toggle mode only (spec §4): require two presses within <see cref="DoubleTapWindow"/> to
+    /// START recording, so a stray single press can't begin a dictation. Stopping is always a
+    /// single press. Ignored in PTT mode.
+    /// </summary>
+    public bool DoubleTapToStart { get; set; } = true;
+
+    /// <summary>Maximum gap between the two presses of a double tap (spec §4).</summary>
+    public static readonly TimeSpan DoubleTapWindow = TimeSpan.FromMilliseconds(350);
+
+    /// <summary>Set by the owner so the hook knows whether a press should start or stop.</summary>
+    public Func<bool>? IsIdle { get; set; }
+
+    private DateTime _lastToggleTap = DateTime.MinValue;
+
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_KEYUP = 0x0101;
@@ -130,8 +145,14 @@ public sealed class HotkeyManager : IDisposable
         if (down && !_isDown)
         {
             _isDown = true;
-            var handler = Mode == DictationMode.Ptt ? Started : Toggled;
-            if (handler is not null) _dispatcher?.BeginInvoke(handler);
+            if (Mode == DictationMode.Ptt)
+            {
+                if (Started is { } started) _dispatcher?.BeginInvoke(started);
+            }
+            else if (ShouldFireToggle())
+            {
+                if (Toggled is { } toggled) _dispatcher?.BeginInvoke(toggled);
+            }
         }
         else if (up && _isDown)
         {
@@ -139,6 +160,25 @@ public sealed class HotkeyManager : IDisposable
             if (Mode == DictationMode.Ptt && Stopped is { } stopped)
                 _dispatcher?.BeginInvoke(stopped);
         }
+    }
+
+    /// <summary>
+    /// Decides whether this Toggle press acts now (spec §4). Starting needs a double tap when the
+    /// option is on; stopping — and everything else — stays a single press.
+    /// </summary>
+    private bool ShouldFireToggle()
+    {
+        bool idle = IsIdle?.Invoke() ?? true;
+        if (!DoubleTapToStart || !idle)
+        {
+            _lastToggleTap = DateTime.MinValue;
+            return true;
+        }
+
+        var now = DateTime.UtcNow;
+        bool isSecondTap = now - _lastToggleTap <= DoubleTapWindow;
+        _lastToggleTap = isSecondTap ? DateTime.MinValue : now;   // consume the pair
+        return isSecondTap;
     }
 
     private bool ModifiersSatisfied(HotkeyBinding b) =>

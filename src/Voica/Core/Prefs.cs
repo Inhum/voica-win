@@ -37,6 +37,7 @@ public static class Prefs
         public string ChatModel { get; set; } = ChatModels.Auto;         // spec §6.1: "auto" | model id
         public string ResolvedChatModel { get; set; } = ChatModels.Seed; // cached resolution
         public string Engine { get; set; } = "cloud";            // spec §2.5: "cloud" | "local"
+        public bool DoubleTapToStart { get; set; } = true;        // spec §4 (Toggle mode)
         public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
         public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
@@ -137,6 +138,13 @@ public static class Prefs
     {
         get { lock (Gate) return _data.Engine.Equals("local", StringComparison.OrdinalIgnoreCase) ? EngineKind.Local : EngineKind.Cloud; }
         set { lock (Gate) { _data.Engine = value == EngineKind.Local ? "local" : "cloud"; Save(); } }
+    }
+
+    /// <summary>Require a double tap to start recording in Toggle mode (spec §4, default on).</summary>
+    public static bool DoubleTapToStart
+    {
+        get { lock (Gate) return _data.DoubleTapToStart; }
+        set { lock (Gate) { _data.DoubleTapToStart = value; Save(); } }
     }
 
     /// <summary>Cloud speech-to-text model (spec §2). Unknown stored values fall back to the default.</summary>

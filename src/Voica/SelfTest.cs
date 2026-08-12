@@ -243,6 +243,12 @@ public static class SelfTest
         Check("prefs hotkey round-trip", Prefs.Hotkey == comboKey);
         Prefs.Hotkey = savedHotkey;
 
+        Check("double-tap window is 0.35 s", HotkeyManager.DoubleTapWindow == TimeSpan.FromMilliseconds(350));
+        var savedDoubleTap = Prefs.DoubleTapToStart;
+        Prefs.DoubleTapToStart = !savedDoubleTap;
+        Check("prefs doubleTap round-trip", Prefs.DoubleTapToStart == !savedDoubleTap);
+        Prefs.DoubleTapToStart = savedDoubleTap;
+
         // --- AutoInsert native INPUT struct size (regression guard for SendInput) ---
         Check("INPUT struct size matches arch",
             AutoInsert.NativeInputSize == (Environment.Is64BitProcess ? 40 : 28));
@@ -283,7 +289,8 @@ public static class SelfTest
             && Prefs.Output == OutputMode.Insert && Prefs.RetentionDays == 30
             && Prefs.StoreAudio && Prefs.Vocabulary == "" && Prefs.CheckUpdatesOnLaunch
             && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess
-            && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto");
+            && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto"
+            && Prefs.DoubleTapToStart);
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;

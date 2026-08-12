@@ -122,6 +122,11 @@ public static class S
         "Applies to the cloud engine only (the local engine is Russian-only). Forcing a language helps with short phrases that auto-detect gets wrong.",
         "Действует только для облачного движка (локальный — русскоязычный). Жёсткий выбор языка помогает с короткими фразами, где автоопределение ошибается.");
 
+    public static string ChkDoubleTap => Loc.T("Double tap to start", "Двойной тап — старт");
+    public static string DoubleTapHint => Loc.T(
+        "In Toggle mode, recording starts only on two quick presses — a stray press won't begin a dictation. Stopping is always a single press. May clash with other apps' shortcuts; doesn't affect push-to-talk or the tray's Dictate item.",
+        "В режиме Toggle запись начинается только двумя быстрыми нажатиями — случайное нажатие не запустит диктовку. Остановка — всегда одно нажатие. Может конфликтовать с шорткатами других приложений; на PTT и пункт «Dictate» не влияет.");
+
     public static string LblOutput => Loc.T("Output", "Вывод");
     public static string OutputInsert => Loc.T("Insert into focused field", "Вставлять в активное поле");
     public static string OutputWindow => Loc.T("Show result window", "Показывать окно результата");

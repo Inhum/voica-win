@@ -62,6 +62,10 @@
                     <TextBlock x:Name="CurrentHotkeyText" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,0" />
                     <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" Text="{x:Static l:S.HotkeyHint}" />
 
+                    <CheckBox x:Name="DoubleTapCheck" Content="{x:Static l:S.ChkDoubleTap}" Margin="0,10,0,0"
+                              Checked="OnDoubleTapChanged" Unchecked="OnDoubleTapChanged" />
+                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Margin="0,2,0,0" Text="{x:Static l:S.DoubleTapHint}" />
+
                     <TextBlock Text="{x:Static l:S.LblOutput}" FontWeight="SemiBold" Margin="0,14,0,4" />
                     <ComboBox x:Name="OutputCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnOutputChanged" />
 
