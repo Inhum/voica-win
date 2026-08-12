@@ -42,6 +42,7 @@ public partial class SettingsWindow : Window
 
         // Cloud STT model / language (spec §2); order matches GroqClient's arrays.
         DoubleTapCheck.IsChecked = Prefs.DoubleTapToStart;
+        OverlayCheck.IsChecked = Prefs.ShowOverlay;
         SttModelCombo.ItemsSource = new[] { S.SttTurbo, S.SttLarge };
         SttModelCombo.SelectedIndex = Array.IndexOf(GroqClient.SttModels, Prefs.SttModel);
         LanguageCombo.ItemsSource = new[] { S.LangAuto, S.LangRu, S.LangEn };
@@ -191,6 +192,13 @@ public partial class SettingsWindow : Window
         if (!_loaded) return;
         Prefs.DoubleTapToStart = DoubleTapCheck.IsChecked == true;
         _onHotkeyChanged();   // re-applies the hotkey settings live
+    }
+
+    private void OnOverlayChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.ShowOverlay = OverlayCheck.IsChecked == true;
+        _onHotkeyChanged();   // the tray re-applies the indicator (capsule vs icon, spec §4.2)
     }
 
     private void OnSttModelChanged(object sender, SelectionChangedEventArgs e)

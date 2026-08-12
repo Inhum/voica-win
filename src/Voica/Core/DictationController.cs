@@ -40,6 +40,9 @@ public sealed class DictationController : IDisposable
 
     public DictationState State => _state;
 
+    /// <summary>Current microphone peak (0..1) for the overlay wave (spec §4.2); 0 unless recording.</summary>
+    public double InputLevel => _recorder.Level;
+
     /// <summary>Installs the hotkey and applies current settings.</summary>
     public void Start()
     {
@@ -78,6 +81,18 @@ public sealed class DictationController : IDisposable
     /// the hotkey mode: idle → start, recording → stop, transcribing → ignored.
     /// </summary>
     public void ToggleDictation() => OnToggle();
+
+    /// <summary>
+    /// Cancels the current recording from the overlay's «×» (spec §4.2): the audio is thrown away
+    /// and nothing is transcribed. No-op unless recording.
+    /// </summary>
+    public void CancelDictation()
+    {
+        if (_state != DictationState.Recording) return;
+        _recorder.Cancel();          // stops capture and deletes the temp WAV
+        SetState(DictationState.Idle);
+        Log.Info("recording cancelled by the user");
+    }
 
     private void BeginRecording()
     {

@@ -1,0 +1,85 @@
+<Window x:Class="Voica.UI.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Voica"
+        Title="Voica"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowActivated="False" ShowInTaskbar="False"
+        ResizeMode="NoResize" SizeToContent="WidthAndHeight" Focusable="False">
+    <Window.Resources>
+        <!-- Round capsule buttons, 28×28 with radius 14 — same metrics as the macOS HUD. -->
+        <Style x:Key="CapsuleButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="#26FFFFFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" CornerRadius="14" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <!-- Tag carries the per-button hover tint (red for cancel, green for stop). -->
+                                <Setter TargetName="Bg" Property="Background"
+                                        Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- Margin leaves room for the drop shadow (the window itself is per-pixel transparent). -->
+    <Border x:Name="Capsule" Margin="16" CornerRadius="22" Padding="12,8" MinHeight="44"
+            Background="#E61B1B1F" BorderBrush="#28FFFFFF" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" ShadowDepth="2" Direction="270" Opacity="0.45" Color="#000000" />
+        </Border.Effect>
+
+        <Grid>
+            <!-- recording: cancel (×) · wave · stop (✓) — same order and colors as the macOS HUD:
+                 a neutral cancel and a system-green confirm, 10 px apart. -->
+            <StackPanel x:Name="RecordingPanel" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="CancelButton" Style="{StaticResource CapsuleButton}" Content="✕"
+                        Foreground="#D9FFFFFF" ToolTip="{x:Static l:S.OverlayCancelTip}"
+                        Margin="0,0,10,0" Click="OnCancel">
+                    <Button.Tag><SolidColorBrush Color="#FFFFFF" Opacity="0.34" /></Button.Tag>
+                </Button>
+                <Border Width="72" Height="22" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <StackPanel x:Name="WavePanel" Orientation="Horizontal"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Button x:Name="StopButton" Style="{StaticResource CapsuleButton}" Content="✓"
+                        Background="#34C759" ToolTip="{x:Static l:S.OverlayStopTip}"
+                        Click="OnStop">
+                    <Button.Tag><SolidColorBrush Color="#4CD964" /></Button.Tag>
+                </Button>
+            </StackPanel>
+
+            <!-- transcribing: spinner + caption, buttons gone (spec §4.2) -->
+            <StackPanel x:Name="TranscribingPanel" Orientation="Horizontal" VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                <Canvas Width="18" Height="18" VerticalAlignment="Center" Margin="4,0,10,0">
+                    <Ellipse Width="18" Height="18" Stroke="#33FFFFFF" StrokeThickness="2" />
+                    <!-- The arc lives in the Canvas's own coordinates, so the rotation center is the
+                         circle center (9,9) — a RenderTransformOrigin here would offset it twice. -->
+                    <Path x:Name="Spinner" Stroke="#FFFFFF" StrokeThickness="2" StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          Data="M 9,1 A 8,8 0 0 1 17,9">
+                        <Path.RenderTransform>
+                            <RotateTransform x:Name="SpinnerRotation" CenterX="9" CenterY="9" />
+                        </Path.RenderTransform>
+                    </Path>
+                </Canvas>
+                <TextBlock Text="{x:Static l:S.OverlayTranscribing}" Foreground="#FFFFFF" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

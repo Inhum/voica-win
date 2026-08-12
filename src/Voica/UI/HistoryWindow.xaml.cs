@@ -97,9 +97,25 @@ public partial class HistoryWindow : Window
     {
         int count = Grid.SelectedItems.Count;
         CopyButton.IsEnabled = count == 1;
-        PlayButton.IsEnabled = count == 1;
         DeleteButton.IsEnabled = count >= 1;
-        if (count > 1) StatusText.Text = string.Format(S.HistSelectedFmt, count);
+        RefreshPlayButton();   // stays enabled (as Stop) while something is playing
+        ResetStatus();
+    }
+
+    /// <summary>
+    /// The idle status line: the size of a multi-selection, otherwise the record count. Called
+    /// whenever a transient message ("Playing…", "7 selected") stops being true.
+    /// </summary>
+    private void ResetStatus()
+    {
+        int selected = Grid.SelectedItems.Count;
+        if (selected > 1)
+        {
+            StatusText.Text = string.Format(S.HistSelectedFmt, selected);
+            return;
+        }
+        int total = Grid.Items.Count;
+        StatusText.Text = total == 0 ? S.HistEmpty : string.Format(S.HistCountFmt, total);
     }
 
     private void OnGridKeyDown(object sender, KeyEventArgs e)
@@ -120,8 +136,18 @@ public partial class HistoryWindow : Window
         }
     }
 
+    /// <summary>True while audio is playing — the Play button doubles as Stop then (spec §7).</summary>
+    private bool IsPlaying => _output is not null;
+
     private void OnPlay(object sender, RoutedEventArgs e)
     {
+        // Same button toggles: playing → stop (parity with the macOS history window).
+        if (IsPlaying)
+        {
+            StopPlayback();
+            return;
+        }
+
         if (Selected is not { } t) return;
         if (t.AudioPath is null || !File.Exists(t.AudioPath))
         {
@@ -138,11 +164,13 @@ public partial class HistoryWindow : Window
             _output.PlaybackStopped += (_, _) => Dispatcher.Invoke(StopPlayback);
             _output.Play();
             StatusText.Text = S.HistPlaying;
+            RefreshPlayButton();
         }
         catch (Exception ex)
         {
-            StatusText.Text = string.Format(S.HistPlayFailFmt, ex.Message);
+            // Stop first — it resets the status line — then leave the error showing.
             StopPlayback();
+            StatusText.Text = string.Format(S.HistPlayFailFmt, ex.Message);
         }
     }
 
@@ -168,9 +196,20 @@ public partial class HistoryWindow : Window
 
     private void StopPlayback()
     {
+        bool wasPlaying = IsPlaying;
         _output?.Dispose();
         _output = null;
         _reader?.Dispose();
         _reader = null;
+        RefreshPlayButton();
+        if (wasPlaying) ResetStatus();   // clears "Playing…", whether stopped by hand or at the end
+    }
+
+    /// <summary>Play ⇄ Stop on the button and the context menu, and keep Stop clickable.</summary>
+    private void RefreshPlayButton()
+    {
+        PlayButton.Content = IsPlaying ? S.BtnStop : S.BtnPlay;
+        PlayMenuItem.Header = IsPlaying ? S.BtnStop : S.BtnPlay;
+        PlayButton.IsEnabled = IsPlaying || Grid.SelectedItems.Count == 1;
     }
 }

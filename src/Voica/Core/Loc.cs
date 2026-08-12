@@ -34,6 +34,17 @@ public static class S
     public static string TrayRecording => Loc.T("Voica — recording…", "Voica — запись…");
     public static string TrayTranscribing => Loc.T("Voica — transcribing…", "Voica — расшифровка…");
 
+    // Dictation overlay (spec §4.2)
+    public static string OverlayTranscribing => Loc.T("Transcribing…", "Распознаю…");
+    public static string OverlayCancelTip => Loc.T("Cancel — discard the recording", "Отменить — запись выбрасывается");
+    public static string OverlayStopTip => Loc.T("Stop and transcribe", "Стоп и распознать");
+    public static string ChkOverlay => Loc.T(
+        "Show a recording bar at the bottom of the screen",
+        "Показывать плашку записи внизу экрана");
+    public static string OverlayHint => Loc.T(
+        "A floating capsule shows the level while recording, with buttons to cancel (discard the audio) or stop and transcribe. While it is on, the tray icon stays neutral; turn it off and the icon indicates the state instead.",
+        "Плавающая капсула показывает уровень во время записи, с кнопками «отменить» (аудио выбрасывается) и «стоп и распознать». Пока она включена, иконка трея не меняется; выключите — состояние показывает иконка.");
+
     // Notices / errors (runtime)
     public static string NoticeInserted => Loc.T("Inserted (also copied to clipboard).", "Вставлено (также скопировано в буфер).");
     public static string NoticeNoSpeech => Loc.T("No speech recognized.", "Речь не распознана.");
@@ -122,7 +133,8 @@ public static class S
         "Applies to the cloud engine only (the local engine is Russian-only). Forcing a language helps with short phrases that auto-detect gets wrong.",
         "Действует только для облачного движка (локальный — русскоязычный). Жёсткий выбор языка помогает с короткими фразами, где автоопределение ошибается.");
 
-    public static string ChkDoubleTap => Loc.T("Double tap to start", "Двойной тап — старт");
+    public static string ChkDoubleTap => Loc.T("Double-tap to start", "Двойной тап — старт");
+    public static string LblCloudSection => Loc.T("Cloud recognition", "Облачное распознавание");
     public static string DoubleTapHint => Loc.T(
         "In Toggle mode, recording starts only on two quick presses — a stray press won't begin a dictation. Stopping is always a single press. May clash with other apps' shortcuts; doesn't affect push-to-talk or the tray's Dictate item.",
         "В режиме Toggle запись начинается только двумя быстрыми нажатиями — случайное нажатие не запустит диктовку. Остановка — всегда одно нажатие. Может конфликтовать с шорткатами других приложений; на PTT и пункт «Dictate» не влияет.");
@@ -199,6 +211,7 @@ public static class S
     public static string ColAudio => Loc.T("Audio", "Аудио");
     public static string BtnCopy => Loc.T("Copy", "Копировать");
     public static string BtnPlay => Loc.T("Play", "Играть");
+    public static string BtnStop => Loc.T("Stop", "Стоп");
     public static string BtnDelete => Loc.T("Delete", "Удалить");
     public static string BtnRefresh => Loc.T("Refresh", "Обновить");
     public static string BtnExport => Loc.T("Export…", "Экспорт…");

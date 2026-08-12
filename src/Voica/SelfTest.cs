@@ -249,6 +249,36 @@ public static class SelfTest
         Check("prefs doubleTap round-trip", Prefs.DoubleTapToStart == !savedDoubleTap);
         Prefs.DoubleTapToStart = savedDoubleTap;
 
+        // --- Dictation overlay geometry / wave math (spec §4.2) ---
+        Check("overlay centers on the work area",
+            OverlayLayout.Left(workLeft: 0, workWidth: 1920, width: 200) == 860
+            && OverlayLayout.Left(workLeft: -1920, workWidth: 1920, width: 200) == -1060);
+        Check("overlay sits above the work area bottom",
+            OverlayLayout.Top(workTop: 0, workHeight: 1040, height: 80, margin: 40) == 920);
+        Check("overlay bar scale clamps to 0..1",
+            OverlayLayout.BarScale(0) == 0 && OverlayLayout.BarScale(-1) == 0
+            && OverlayLayout.BarScale(1) == 1 && OverlayLayout.BarScale(50) == 1);
+        Check("overlay bar scale is monotonic and lifts quiet speech",
+            OverlayLayout.BarScale(0.05) < OverlayLayout.BarScale(0.2)
+            && OverlayLayout.BarScale(0.05) > 0.05);
+        Check("overlay bar height spans min..max",
+            OverlayLayout.BarHeight(0, 1) == OverlayLayout.MinBarHeight
+            && OverlayLayout.BarHeight(1, 1) == OverlayLayout.MaxBarHeight
+            && OverlayLayout.BarHeight(2, 1) == OverlayLayout.MaxBarHeight);
+        Check("overlay wave has a symmetric 7-bar weight profile (macOS parity)",
+            OverlayLayout.BarWeights.Length == 7
+            && OverlayLayout.BarWeights[0] == OverlayLayout.BarWeights[6]
+            && OverlayLayout.BarWeights[1] == OverlayLayout.BarWeights[5]
+            && OverlayLayout.BarWeights[2] == OverlayLayout.BarWeights[4]
+            && OverlayLayout.BarWeights[3] == 1.0);
+        Check("overlay wave fits the 72 px well",
+            OverlayLayout.BarWeights.Length * (OverlayLayout.BarWidth + OverlayLayout.BarGap) <= 72);
+
+        var savedOverlay = Prefs.ShowOverlay;
+        Prefs.ShowOverlay = !savedOverlay;
+        Check("prefs showOverlay round-trip", Prefs.ShowOverlay == !savedOverlay);
+        Prefs.ShowOverlay = savedOverlay;
+
         // --- AutoInsert native INPUT struct size (regression guard for SendInput) ---
         Check("INPUT struct size matches arch",
             AutoInsert.NativeInputSize == (Environment.Is64BitProcess ? 40 : 28));
@@ -283,6 +313,8 @@ public static class SelfTest
         var snapMode = Prefs.Mode; var snapHotkey = Prefs.Hotkey; var snapOut = Prefs.Output;
         var snapDays = Prefs.RetentionDays; var snapStore = Prefs.StoreAudio;
         var snapVocab2 = Prefs.Vocabulary; var snapCheck = Prefs.CheckUpdatesOnLaunch;
+        var snapOverlay = Prefs.ShowOverlay; var snapTap = Prefs.DoubleTapToStart;
+        var snapNotify = Prefs.NotifyOnInsert;
         Prefs.Reset();
         Check("reset yields windows defaults",
             Prefs.Mode == DictationMode.Toggle && Prefs.Hotkey == HotkeyBinding.Default
@@ -290,10 +322,12 @@ public static class SelfTest
             && Prefs.StoreAudio && Prefs.Vocabulary == "" && Prefs.CheckUpdatesOnLaunch
             && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess
             && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto"
-            && Prefs.DoubleTapToStart);
+            && Prefs.DoubleTapToStart && Prefs.ShowOverlay);
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;
+        Prefs.ShowOverlay = snapOverlay; Prefs.DoubleTapToStart = snapTap;
+        Prefs.NotifyOnInsert = snapNotify;
 
         // --- KeyStore round-trip (restore the exact original file, if any) ---
         var savedKey = KeyStore.Load();

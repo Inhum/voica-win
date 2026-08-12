@@ -22,6 +22,7 @@ public sealed class TrayIconController : IDisposable
     private SettingsWindow? _settingsWindow;
     private MenuItem? _updateMenuItem;
     private string? _updateUrl;
+    private OverlayWindow? _overlay;
 
     private readonly ImageSource _idleIcon = Load("tray-idle.ico");
     private readonly ImageSource _recordingIcon = Load("tray-recording.ico");
@@ -76,11 +77,26 @@ public sealed class TrayIconController : IDisposable
         _ = MaybeCheckUpdatesOnLaunchAsync();
     }
 
+    /// <summary>
+    /// Reflects the dictation state (spec §4.2). Exactly one indicator lights up: with the overlay
+    /// on, the capsule carries the state and the tray icon stays neutral; with it off, the icon does
+    /// the whole job (recording pulses, transcribing is a static accent).
+    /// </summary>
     private void SetState(DictationState state)
     {
+        if (Prefs.ShowOverlay) UpdateOverlay(state);
+        else HideOverlay();
+
         if (_icon is null) return;
 
         _pulseTimer.Stop();
+        if (Prefs.ShowOverlay)
+        {
+            _icon.IconSource = _idleIcon;
+            _icon.ToolTipText = S.Tray;
+            return;
+        }
+
         switch (state)
         {
             case DictationState.Recording:
@@ -100,6 +116,34 @@ public sealed class TrayIconController : IDisposable
         }
     }
 
+    private void UpdateOverlay(DictationState state)
+    {
+        if (state == DictationState.Idle)
+        {
+            HideOverlay();
+            return;
+        }
+
+        if (_overlay is null)
+        {
+            _overlay = new OverlayWindow(() => _controller?.InputLevel ?? 0);
+            _overlay.Cancelled += () => _controller?.CancelDictation();
+            _overlay.Stopped += () => _controller?.ToggleDictation();
+        }
+
+        if (state == DictationState.Recording) _overlay.ShowRecording();
+        else _overlay.ShowTranscribing();
+    }
+
+    private void HideOverlay() => _overlay?.HideOverlay();
+
+    /// <summary>Re-applies settings that affect the running app (hotkey + indicator, spec §4/§4.2).</summary>
+    private void OnSettingsChanged()
+    {
+        _controller?.ApplySettings();
+        SetState(_controller?.State ?? DictationState.Idle);
+    }
+
     private void ShowError(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Error);
 
     private void ShowNotice(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Info);
@@ -115,7 +159,7 @@ public sealed class TrayIconController : IDisposable
     {
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(() => _controller?.ApplySettings());
+            _settingsWindow = new SettingsWindow(OnSettingsChanged);
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Show();
         }
@@ -235,6 +279,8 @@ public sealed class TrayIconController : IDisposable
     public void Dispose()
     {
         _pulseTimer.Stop();
+        _overlay?.Close();
+        _overlay = null;
         _controller?.Dispose();
         _controller = null;
         _icon?.Dispose();

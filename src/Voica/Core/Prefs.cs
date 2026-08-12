@@ -41,6 +41,7 @@ public static class Prefs
         public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
         public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
+        public bool ShowOverlay { get; set; } = true;            // spec §4.2, on by default
     }
 
     private static Data Load()
@@ -218,6 +219,16 @@ public static class Prefs
     {
         get { lock (Gate) return _data.NotifyOnInsert; }
         set { lock (Gate) { _data.NotifyOnInsert = value; Save(); } }
+    }
+
+    /// <summary>
+    /// Show the floating dictation capsule at the bottom of the screen (spec §4.2, default on).
+    /// While it is on the tray icon stays neutral; off falls back to the icon-only indication.
+    /// </summary>
+    public static bool ShowOverlay
+    {
+        get { lock (Gate) return _data.ShowOverlay; }
+        set { lock (Gate) { _data.ShowOverlay = value; Save(); } }
     }
 
     /// <summary>Resets all settings to defaults (for Delete all data, spec §11).</summary>

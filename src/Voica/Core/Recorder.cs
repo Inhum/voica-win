@@ -23,8 +23,15 @@ public sealed class Recorder : IDisposable
     private string? _filePath;
     private DateTime _startUtc;
     private TaskCompletionSource<bool>? _stopped;
+    private double _level;
 
     public bool IsRecording => _waveIn is not null;
+
+    /// <summary>
+    /// Current input peak, 0..1, updated on the capture thread — drives the overlay wave (spec §4.2).
+    /// Read-only snapshot; 0 while not recording.
+    /// </summary>
+    public double Level => System.Threading.Volatile.Read(ref _level);
 
     /// <summary>Begins recording to a fresh temp WAV file. Throws if the mic can't be opened.</summary>
     public void Start()
@@ -40,6 +47,7 @@ public sealed class Recorder : IDisposable
         _waveIn.RecordingStopped += OnRecordingStopped;
         _stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _startUtc = DateTime.UtcNow;
+        System.Threading.Volatile.Write(ref _level, 0);
 
         _waveIn.StartRecording();
     }
@@ -62,6 +70,7 @@ public sealed class Recorder : IDisposable
         _writer = null;
         waveIn.Dispose();
         _waveIn = null;
+        System.Threading.Volatile.Write(ref _level, 0);
 
         var path = _filePath!;
         _filePath = null;
@@ -103,11 +112,32 @@ public sealed class Recorder : IDisposable
         _waveIn.Dispose();
         _waveIn = null;
         _filePath = null;
+        System.Threading.Volatile.Write(ref _level, 0);
         if (path is not null) TryDelete(path);
     }
 
-    private void OnDataAvailable(object? sender, WaveInEventArgs e) =>
+    private void OnDataAvailable(object? sender, WaveInEventArgs e)
+    {
         _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+        UpdateLevel(e.Buffer, e.BytesRecorded);
+    }
+
+    /// <summary>
+    /// Tracks the buffer's peak amplitude for the overlay wave: fast attack, slow decay, so the
+    /// bars follow speech instead of flickering with every 50 ms buffer.
+    /// </summary>
+    private void UpdateLevel(byte[] buffer, int bytes)
+    {
+        int peak = 0;
+        for (int i = 0; i + 1 < bytes; i += 2)
+        {
+            int sample = Math.Abs((short)(buffer[i] | (buffer[i + 1] << 8)));
+            if (sample > peak) peak = sample;
+        }
+        double raw = peak / 32768.0;
+        double previous = System.Threading.Volatile.Read(ref _level);
+        System.Threading.Volatile.Write(ref _level, Math.Max(raw, previous * 0.65));
+    }
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs e) =>
         _stopped?.TrySetResult(true);

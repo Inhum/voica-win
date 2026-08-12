@@ -24,7 +24,7 @@
             <DataGrid.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="{x:Static l:S.BtnCopy}" Click="OnCopy" />
-                    <MenuItem Header="{x:Static l:S.BtnPlay}" Click="OnPlay" />
+                    <MenuItem x:Name="PlayMenuItem" Header="{x:Static l:S.BtnPlay}" Click="OnPlay" />
                     <Separator />
                     <MenuItem Header="{x:Static l:S.BtnDelete}" Click="OnDelete" />
                 </ContextMenu>
