@@ -37,7 +37,12 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 
 - **Global hotkey dictation** — Push‑to‑talk (hold) or Toggle (press to start/stop). Default:
   **Toggle + Right Alt**. Pick a preset key (Right/Left Alt, CapsLock, ScrollLock, Pause) or record
-  a **custom combination** (e.g. `Ctrl+Shift+Space`).
+  a **custom combination** (e.g. `Ctrl+Shift+Space`). In Toggle mode a **double tap** starts the
+  recording, so a stray press can't.
+- **Dictation bar** — a floating capsule at the bottom of the screen shows the live level while you
+  speak, with **×** to cancel (the audio is discarded) and **✓** to stop and transcribe. It never
+  takes focus, so the text still lands in the field you were typing in. Can be turned off, and then
+  the tray icon indicates the state instead.
 - **Punctuation via Groq Whisper** — pick the model (`whisper-large-v3-turbo` or `whisper-large-v3`)
   and the language (auto‑detect, great for mixed Russian/English, or force Russian/English).
 - **Local offline engine** (optional) — recognition fully on your PC via **GigaAM v3** (Russian,
@@ -45,8 +50,8 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   Voica automatically falls back to the local engine when the model is installed.
 - **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
   the clipboard as a fallback. Or show an editable **result window**.
-- **History** (SQLite) — browse, re‑copy, play the audio, delete, and **export** the whole history
-  to Markdown, CSV or JSON.
+- **History** (SQLite) — browse, re‑copy, play the audio, delete (one or a whole multi‑selection),
+  and **export** the entire history to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
 - **Vocabulary** — a hint list of terms/names Whisper often mangles, plus an optional **AI pass**
@@ -72,6 +77,10 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 ![Settings — Data](docs/settings-data.png)
 
 ![Settings — About](docs/settings-about.png)
+
+**Dictation bar** — while recording (level wave, cancel, stop):
+
+![Dictation bar](docs/hud.png)
 
 **History** — browse, re‑copy, play, delete, export:
 
@@ -125,12 +134,15 @@ On first launch (with no key set) the **Settings** window opens. Paste your Groq
 
 ## Usage
 
-- **Dictate:** press **Right Alt** (default), speak, press **Right Alt** again to stop (Toggle
+- **Dictate:** double‑tap **Right Alt** (default), speak, press **Right Alt** once to stop (Toggle
   mode). In PTT mode, hold to talk and release to send.
+- While recording, the bar at the bottom of the screen shows the level: **×** cancels (the
+  recording is discarded), **✓** stops and transcribes.
 - The recognized text is inserted into the focused field and copied to the clipboard.
 - Right‑click the tray icon for **Settings**, **History**, **Check for Updates**, and **About**.
 
-The tray icon reflects state: idle (blue), recording (pulsing red), transcribing (amber).
+With the dictation bar on (the default), the tray icon stays neutral. Turn it off and the icon
+reflects state instead: idle (blue), recording (pulsing red), transcribing (amber).
 
 ## Settings
 
@@ -138,6 +150,8 @@ The tray icon reflects state: idle (blue), recording (pulsing red), transcribing
 |---|---|
 | Dictation mode | PTT (hold) or Toggle |
 | Hotkey | Preset single key or a custom combination |
+| Double tap to start | Toggle mode only; on by default (0.35 s window) |
+| Show a recording bar | The bottom‑of‑screen capsule; on by default |
 | Output | Insert into field, or show a result window |
 | Store audio recordings | On by default |
 | Show a notification after inserting | The tray balloon; can be turned off |

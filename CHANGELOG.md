@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-12
+
+### Added
+- **Dictation bar** (spec §4.2, on by default): a floating capsule at the bottom center of the
+  screen, above other windows, that never takes focus. While recording it shows a live level wave
+  with **×** (cancel — the audio is discarded, nothing is transcribed) and **✓** (stop and
+  transcribe); during transcription the wave and buttons give way to a spinner and "Transcribing…".
+  Cancelling a dictation is a new path — previously a started recording could only be sent.
+  Layout, colors and metrics follow the macOS HUD. Toggle: Settings → Dictation.
+  On a multi-monitor setup the bar appears on the screen showing the focused window — where the
+  text is going to land — and honors that monitor's scaling.
+- **Exactly one indicator at a time** (spec §4.2): while the bar is on, the tray icon stays
+  neutral in every state. Turn the bar off and the old icon behavior returns (pulsing while
+  recording, a static accent while transcribing).
+- **Double tap to start** in Toggle mode (spec §4, on by default, 0.35 s window): a stray press no
+  longer starts a dictation. Stopping is always a single press; push-to-talk and the tray's
+  "Dictate" item are unaffected. Can be turned off in Settings → Dictation.
+- **Multi-select and batch delete in History** (spec §7): Ctrl/Shift/Ctrl+A, the Delete key and
+  the context menu; the whole selection (with its audio) is removed in one transaction.
+- **"Support the project"** link (Boosty) in Settings → About, plus a GitHub funding entry.
+- **Vocabulary and AI-correction user guide** in Russian: [docs/terms-ai.ru.md](docs/terms-ai.ru.md),
+  linked from the README.
+
+### Changed
+- Settings → Dictation now follows the macOS layout: the long explanations moved into ⓘ tooltips,
+  "Double-tap to start" sits on the hotkey row where it belongs, and the model/language controls
+  got their own "Cloud recognition" heading. The window is noticeably shorter.
+- History: **Play** becomes **Stop** while audio is playing and turns back when playback ends, so
+  there is a visible way to stop it (parity with macOS).
+
 ## [0.5.0] - 2026-07-30
 
 ### Added
