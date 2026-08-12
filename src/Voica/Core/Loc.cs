@@ -215,7 +215,12 @@ public static class S
     public static string HistPlaying => Loc.T("Playing…", "Воспроизведение…");
     public static string HistPlayFailFmt => Loc.T("Playback failed: {0}", "Ошибка воспроизведения: {0}");
     public static string HistDeleteConfirm => Loc.T("Delete this transcription (and its audio)?", "Удалить эту запись (и аудио)?");
+    public static string HistDeleteManyConfirmFmt => Loc.T(
+        "Delete {0} transcriptions (and their audio)?",
+        "Удалить записей: {0} (вместе с аудио)?");
     public static string HistDeleted => Loc.T("Deleted.", "Удалено.");
+    public static string HistDeletedManyFmt => Loc.T("Deleted {0} record(s).", "Удалено записей: {0}.");
+    public static string HistSelectedFmt => Loc.T("{0} selected.", "Выделено: {0}.");
 
     // Result window
     public static string ResultCopied => Loc.T("Copied", "Скопировано");

@@ -142,6 +142,45 @@ public sealed class Store
         }
     }
 
+    /// <summary>
+    /// Deletes several records at once (spec §7): one table read for the whole batch and a single
+    /// transaction, rather than a loop of single deletes. Their audio files go too.
+    /// Returns how many rows were removed.
+    /// </summary>
+    public int DeleteMany(IReadOnlyCollection<long> ids)
+    {
+        if (ids.Count == 0) return 0;
+
+        lock (_gate)
+        {
+            var idList = string.Join(",", ids);   // ids are longs from our own rows — safe to inline
+            var audioFiles = new List<string>();
+
+            using (var sel = _connection.CreateCommand())
+            {
+                sel.CommandText = $"SELECT audio_filename FROM transcriptions WHERE id IN ({idList}) AND audio_filename IS NOT NULL;";
+                using var reader = sel.ExecuteReader();
+                while (reader.Read())
+                    audioFiles.Add(reader.GetString(0));
+            }
+
+            int deleted;
+            using (var tx = _connection.BeginTransaction())
+            {
+                using var del = _connection.CreateCommand();
+                del.Transaction = tx;
+                del.CommandText = $"DELETE FROM transcriptions WHERE id IN ({idList});";
+                deleted = del.ExecuteNonQuery();
+                tx.Commit();
+            }
+
+            foreach (var filename in audioFiles)
+                TryDelete(Path.Combine(Paths.AudioDir, filename));
+
+            return deleted;
+        }
+    }
+
     /// <summary>Number of records.</summary>
     public int Count()
     {

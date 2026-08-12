@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using NAudio.Wave;
 
 namespace Voica.UI;
@@ -85,6 +88,29 @@ public partial class HistoryWindow : Window
 
     private Transcription? Selected => (Grid.SelectedItem as Row)?.Item;
 
+    /// <summary>All selected records (spec §7: multi-select).</summary>
+    private List<Transcription> SelectedItems =>
+        Grid.SelectedItems.OfType<Row>().Select(r => r.Item).ToList();
+
+    /// <summary>Copy/Play only make sense for a single record; delete works on the whole selection.</summary>
+    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        int count = Grid.SelectedItems.Count;
+        CopyButton.IsEnabled = count == 1;
+        PlayButton.IsEnabled = count == 1;
+        DeleteButton.IsEnabled = count >= 1;
+        if (count > 1) StatusText.Text = string.Format(S.HistSelectedFmt, count);
+    }
+
+    private void OnGridKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && Grid.SelectedItems.Count > 0)
+        {
+            OnDelete(sender, e);
+            e.Handled = true;
+        }
+    }
+
     private void OnCopy(object sender, RoutedEventArgs e)
     {
         if (Selected is { } t)
@@ -122,15 +148,20 @@ public partial class HistoryWindow : Window
 
     private void OnDelete(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } t) return;
-        var confirm = MessageBox.Show(S.HistDeleteConfirm, "Voica",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+        var items = SelectedItems;
+        if (items.Count == 0) return;
+
+        var question = items.Count == 1
+            ? S.HistDeleteConfirm
+            : string.Format(S.HistDeleteManyConfirmFmt, items.Count);
+        if (MessageBox.Show(question, "Voica", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
 
         StopPlayback();
-        Store.Shared.Delete(t.Id);
+        // One batch delete (single transaction), not a loop of single deletes (spec §7).
+        int deleted = Store.Shared.DeleteMany(items.Select(t => t.Id).ToList());
         Reload();
-        StatusText.Text = S.HistDeleted;
+        StatusText.Text = deleted == 1 ? S.HistDeleted : string.Format(S.HistDeletedManyFmt, deleted);
     }
 
     private void OnRefresh(object sender, RoutedEventArgs e) => Reload();

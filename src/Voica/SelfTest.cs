@@ -323,8 +323,11 @@ public static class SelfTest
             _ = Store.Shared.All();   // read concurrently with others' inserts
         });
         Check("store concurrent inserts", stressIds.Count == 50);
-        Parallel.ForEach(stressIds, sid => Store.Shared.Delete(sid));
-        Check("store concurrent cleanup", Store.Shared.Count() == stressBefore);
+        // Batch delete doubles as the cleanup for the stress rows (spec §7).
+        int batchDeleted = Store.Shared.DeleteMany(stressIds.ToList());
+        Check("store batch delete removes the whole selection",
+            batchDeleted == stressIds.Count && Store.Shared.Count() == stressBefore);
+        Check("store batch delete on empty list is a no-op", Store.Shared.DeleteMany(Array.Empty<long>()) == 0);
 
         // --- Store: audio lifecycle + retention purge (spec §7, §8) ---
         var savedStoreAudio = Prefs.StoreAudio;

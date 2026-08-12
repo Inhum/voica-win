@@ -14,11 +14,21 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   HeadersVisibility="Column"
-                  SelectionMode="Single"
+                  SelectionMode="Extended"
                   GridLinesVisibility="Horizontal"
                   CanUserResizeRows="False"
                   RowHeight="26"
-                  MouseDoubleClick="OnCopy">
+                  MouseDoubleClick="OnCopy"
+                  SelectionChanged="OnSelectionChanged"
+                  PreviewKeyDown="OnGridKeyDown">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="{x:Static l:S.BtnCopy}" Click="OnCopy" />
+                    <MenuItem Header="{x:Static l:S.BtnPlay}" Click="OnPlay" />
+                    <Separator />
+                    <MenuItem Header="{x:Static l:S.BtnDelete}" Click="OnDelete" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="{x:Static l:S.ColWhen}" Binding="{Binding When}" Width="150" />
                 <DataGridTextColumn Header="{x:Static l:S.ColText}" Binding="{Binding Preview}" Width="*" />
