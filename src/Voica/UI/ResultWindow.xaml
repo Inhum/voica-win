@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Voica"
         Title="Voica" Width="480" Height="320"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         ShowInTaskbar="True">
     <Grid Margin="12">
         <Grid.RowDefinitions>

@@ -29,37 +29,6 @@ public partial class OverlayWindow : Window
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-    // Placement talks to Win32 in physical pixels: the app is PerMonitorV2, so a monitor's work
-    // area and the window's own size only line up in device pixels, whatever each monitor's scale.
-    private const uint MONITOR_DEFAULTTONEAREST = 2;
-    private const uint SWP_NOSIZE = 0x0001, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RECT { public int Left, Top, Right, Bottom; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT { public int X, Y; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MONITORINFO
-    {
-        public int cbSize;
-        public RECT rcMonitor;
-        public RECT rcWork;
-        public uint dwFlags;
-    }
-
-    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
-    [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
-    [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT pt);
-    [DllImport("user32.dll")] private static extern bool GetMonitorInfoW(IntPtr monitor, ref MONITORINFO info);
-    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] private static extern int GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
-    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after,
-        int x, int y, int cx, int cy, uint flags);
-
     private readonly Rectangle[] _bars;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(60) };
     private readonly Func<double> _level;
@@ -107,7 +76,8 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>Shows the capsule in its recording state (wave + buttons).</summary>
-    public void ShowRecording()
+    /// <param name="monitor">The dictation's monitor; <c>default</c> picks it here.</param>
+    public void ShowRecording(IntPtr monitor = default)
     {
         RecordingPanel.Visibility = Visibility.Visible;
         TranscribingPanel.Visibility = Visibility.Collapsed;
@@ -115,17 +85,18 @@ public partial class OverlayWindow : Window
         _phase = 0;
         // The monitor is picked once per appearance, so alt-tabbing mid-dictation doesn't make
         // the capsule hop between screens.
-        if (!IsVisible) { _monitor = PickMonitor(); Show(); }
+        if (!IsVisible) { _monitor = monitor == IntPtr.Zero ? ScreenPlacement.PickMonitor() : monitor; Show(); }
         Reposition();
         _timer.Start();
     }
 
     /// <summary>Switches the capsule to its transcribing state (spinner + caption).</summary>
-    public void ShowTranscribing()
+    /// <param name="monitor">The dictation's monitor; <c>default</c> picks it here.</param>
+    public void ShowTranscribing(IntPtr monitor = default)
     {
         RecordingPanel.Visibility = Visibility.Collapsed;
         TranscribingPanel.Visibility = Visibility.Visible;
-        if (!IsVisible) { _monitor = PickMonitor(); Show(); }
+        if (!IsVisible) { _monitor = monitor == IntPtr.Zero ? ScreenPlacement.PickMonitor() : monitor; Show(); }
         Reposition();
         // The wave is gone; the spinner runs as an animation, at the compositor's frame rate
         // rather than in ticks of the wave timer.
@@ -167,43 +138,12 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void Reposition()
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle == IntPtr.Zero) return;
+        if (ScreenPlacement.BottomCenter(this, _monitor, OverlayLayout.BottomMargin)) return;
 
-        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-        if (_monitor == IntPtr.Zero || !GetMonitorInfoW(_monitor, ref info) ||
-            !GetWindowRect(handle, out var window))
-        {
-            // Fall back to the primary work area in WPF units.
-            var area = SystemParameters.WorkArea;
-            Left = OverlayLayout.Left(area.Left, area.Width, ActualWidth);
-            Top = OverlayLayout.Top(area.Top, area.Height, ActualHeight);
-            return;
-        }
-
-        double width = window.Right - window.Left;
-        double height = window.Bottom - window.Top;
-        double margin = OverlayLayout.BottomMargin * GetDpiForWindow(handle) / 96.0;
-
-        int x = (int)Math.Round(OverlayLayout.Left(info.rcWork.Left, info.rcWork.Right - info.rcWork.Left, width));
-        int y = (int)Math.Round(OverlayLayout.Top(info.rcWork.Top, info.rcWork.Bottom - info.rcWork.Top, height, margin));
-        SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-    }
-
-    /// <summary>
-    /// The monitor the capsule belongs to: the one with the focused window. When the dictation was
-    /// started from our own UI (the tray menu takes focus), the mouse decides instead.
-    /// </summary>
-    private static IntPtr PickMonitor()
-    {
-        var foreground = GetForegroundWindow();
-        if (foreground != IntPtr.Zero)
-        {
-            GetWindowThreadProcessId(foreground, out uint pid);
-            if (pid != (uint)Environment.ProcessId)
-                return MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST);
-        }
-        return GetCursorPos(out var cursor) ? MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST) : IntPtr.Zero;
+        // No monitor info — fall back to the primary work area in WPF units.
+        var area = SystemParameters.WorkArea;
+        Left = OverlayLayout.Left(area.Left, area.Width, ActualWidth);
+        Top = OverlayLayout.Top(area.Top, area.Height, ActualHeight);
     }
 
     private void OnCancel(object sender, RoutedEventArgs e) => Cancelled?.Invoke();

@@ -23,6 +23,7 @@ public sealed class TrayIconController : IDisposable
     private MenuItem? _updateMenuItem;
     private string? _updateUrl;
     private OverlayWindow? _overlay;
+    private IntPtr _sessionMonitor;
 
     private readonly ImageSource _idleIcon = Load("tray-idle.ico");
     private readonly ImageSource _recordingIcon = Load("tray-recording.ico");
@@ -84,6 +85,13 @@ public sealed class TrayIconController : IDisposable
     /// </summary>
     private void SetState(DictationState state)
     {
+        // One monitor per dictation, decided when recording starts and used by both the bar and the
+        // result window (spec §4.2/§5) — the screen with the focused window, where the text goes.
+        if (state == DictationState.Recording && _sessionMonitor == IntPtr.Zero)
+            _sessionMonitor = ScreenPlacement.PickMonitor();
+        else if (state == DictationState.Idle)
+            _sessionMonitor = IntPtr.Zero;
+
         if (Prefs.ShowOverlay) UpdateOverlay(state);
         else HideOverlay();
 
@@ -131,8 +139,8 @@ public sealed class TrayIconController : IDisposable
             _overlay.Stopped += () => _controller?.ToggleDictation();
         }
 
-        if (state == DictationState.Recording) _overlay.ShowRecording();
-        else _overlay.ShowTranscribing();
+        if (state == DictationState.Recording) _overlay.ShowRecording(_sessionMonitor);
+        else _overlay.ShowTranscribing(_sessionMonitor);
     }
 
     private void HideOverlay() => _overlay?.HideOverlay();
@@ -150,7 +158,8 @@ public sealed class TrayIconController : IDisposable
 
     private void ShowResultWindow(string text)
     {
-        var window = new ResultWindow(text);
+        // Same screen as the bar, not the one under the mouse (spec §5).
+        var window = new ResultWindow(text, _sessionMonitor);
         window.Show();
         window.Activate();
     }
