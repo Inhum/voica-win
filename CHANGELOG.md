@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-08-14
+
+### Fixed
+- **The result window opened on the wrong monitor.** In the "show result window" output mode it
+  appeared on the screen holding the *mouse pointer* instead of the screen where the dictation
+  happened — so parking the pointer on another monitor while typing sent the text over there.
+  Both the dictation bar and the result window now use the screen of the focused window, picked
+  once when recording starts (spec §5). Insert mode was never affected.
+
+### Internal
+- Window placement lives in one helper (`ScreenPlacement`) shared by the bar and the result
+  window: the monitor is resolved from the focused window and positions are set in device pixels,
+  which is what a PerMonitorV2 app needs when monitors have different scaling.
+- Vendored the updated CORE-SPEC (§5 gains the result-window rule; the multi-monitor rule is now
+  confirmed on both platforms) and rewrote [docs/ROADMAP.md](docs/ROADMAP.md) to mirror the macOS
+  roadmap.
+
 ## [0.6.0] - 2026-08-12
 
 ### Added
