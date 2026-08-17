@@ -38,12 +38,22 @@ jobs:
             if ($p.ExitCode -ne 0) { exit 1 }
           }
 
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$version installer\voica.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Stage assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force out/assets | Out-Null
+          $version = "${{ github.ref_name }}" -replace '^v', ''
           Copy-Item out/self/Voica.exe out/assets/Voica.exe
           Copy-Item out/fx/Voica.exe out/assets/Voica-fx.exe
+          Copy-Item "out/installer/Voica-Setup-$version.exe" out/assets/
           Get-ChildItem out/assets | Select-Object Name, Length
 
       - name: Create GitHub Release
@@ -52,8 +62,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
           $notes = ".github/release-notes/$tag.md"
           $cliArgs = @("release", "create", $tag,
+                       "out/assets/Voica-Setup-$version.exe",
                        "out/assets/Voica.exe", "out/assets/Voica-fx.exe",
                        "--title", "Voica $tag")
           if (Test-Path $notes) { $cliArgs += @("--notes-file", $notes) }

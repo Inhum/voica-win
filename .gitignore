@@ -17,6 +17,7 @@ secrets.*
 # OS
 Thumbs.db
 Desktop.ini
+.DS_Store
 
 # Claude local settings
 .claude/settings.local.json
