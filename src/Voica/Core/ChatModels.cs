@@ -17,26 +17,35 @@ public static class ChatModels
     public const string Auto = "auto";
 
     /// <summary>Seed used before the first successful resolve (first run / offline).</summary>
-    public const string Seed = "llama-3.3-70b-versatile";
+    public const string Seed = "openai/gpt-oss-120b";
 
-    /// <summary>Preference order when resolving automatically (spec §6.1).</summary>
+    /// <summary>
+    /// Preference order when resolving automatically (spec §6.1), largest first among what Groq
+    /// actually serves. The chain is a consumable, not a constant: it gets revised whenever the
+    /// provider retires a model (`gemma2-9b-it` vanished; `llama-3.3-70b-versatile` was withdrawn
+    /// on 2026-08-16, and Groq itself named gpt-oss-120b and qwen3.6-27b as the replacements).
+    /// Free-tier rate limits deliberately do NOT influence the order — one correction request is
+    /// a vocabulary plus a single dictation, so even the lowest tier covers hundreds a day, and
+    /// correction quality matters more than headroom.
+    /// </summary>
     public static readonly string[] PriorityChain =
     {
-        "llama-3.3-70b-versatile",
         "openai/gpt-oss-120b",
+        "qwen/qwen3.6-27b",
         "openai/gpt-oss-20b",
         "llama-3.1-8b-instant",
-        "gemma2-9b-it",
     };
 
     /// <summary>
     /// Substrings marking non-chat models. Groq exposes no "is chat" flag, so we use a denylist:
     /// anything not obviously speech/embedding/safety related counts as usable, which lets new
-    /// chat families work without an app update.
+    /// chat families work without an app update. <c>compound</c> is excluded for a different
+    /// reason (spec §6.1): those are Groq's agentic systems with their own routing and tools —
+    /// an extra layer for one short term fix, and they route to models the org may not have.
     /// </summary>
     private static readonly string[] Denylist =
     {
-        "whisper", "tts", "orpheus", "guard", "embed", "moderation", "distil",
+        "whisper", "tts", "orpheus", "guard", "embed", "moderation", "distil", "compound",
     };
 
     /// <summary>True if a model id looks like a usable chat model.</summary>

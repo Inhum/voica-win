@@ -79,27 +79,41 @@ public static class SelfTest
             !ChatModels.IsChatModel("whisper-large-v3") && !ChatModels.IsChatModel("playai-tts")
             && !ChatModels.IsChatModel("meta-llama/llama-guard-4-12b")
             && !ChatModels.IsChatModel("distil-whisper-large-v3-en")
-            && ChatModels.IsChatModel("llama-3.3-70b-versatile"));
+            && ChatModels.IsChatModel("openai/gpt-oss-120b"));
+        // Groq's agentic systems are not chat models for our purposes (spec §6.1).
+        Check("chat denylist filters compound",
+            !ChatModels.IsChatModel("groq/compound") && !ChatModels.IsChatModel("compound-mini"));
+        Check("chat chain and seed hold only live models",
+            ChatModels.Seed == "openai/gpt-oss-120b"
+            && ChatModels.PriorityChain[0] == ChatModels.Seed
+            && !ChatModels.PriorityChain.Contains("llama-3.3-70b-versatile")
+            && !ChatModels.PriorityChain.Contains("gemma2-9b-it")
+            && ChatModels.PriorityChain.All(ChatModels.IsChatModel));
         Check("chat resolve prefers priority chain",
-            ChatModels.Resolve(new[] { "gemma2-9b-it", "openai/gpt-oss-20b", "llama-3.3-70b-versatile" }, ChatModels.Auto)
-                == "llama-3.3-70b-versatile");
+            ChatModels.Resolve(new[] { "llama-3.1-8b-instant", "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, ChatModels.Auto)
+                == "openai/gpt-oss-120b");
         Check("chat resolve honours explicit choice",
-            ChatModels.Resolve(new[] { "gemma2-9b-it", "llama-3.3-70b-versatile" }, "gemma2-9b-it") == "gemma2-9b-it");
+            ChatModels.Resolve(new[] { "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, "openai/gpt-oss-20b") == "openai/gpt-oss-20b");
         Check("chat resolve drops retired choice",
-            ChatModels.Resolve(new[] { "gemma2-9b-it" }, "qwen/qwen3-32b") == "gemma2-9b-it");
+            ChatModels.Resolve(new[] { "openai/gpt-oss-20b" }, "qwen/qwen3-32b") == "openai/gpt-oss-20b");
         Check("chat resolve falls back to first live",
             ChatModels.Resolve(new[] { "some-new-model" }, ChatModels.Auto) == "some-new-model");
         Check("chat resolve null when nothing usable",
             ChatModels.Resolve(new[] { "whisper-large-v3", "playai-tts" }, ChatModels.Auto) is null);
         Check("chat choiceRetired detects gone model",
-            ChatModels.ChoiceRetired(new[] { "gemma2-9b-it" }, "llama-3.3-70b-versatile")
-            && !ChatModels.ChoiceRetired(new[] { "gemma2-9b-it" }, ChatModels.Auto));
+            ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, "llama-3.3-70b-versatile")
+            && !ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, ChatModels.Auto));
 
         var savedChat = Prefs.ChatModel; var savedResolved = Prefs.ResolvedChatModel;
         Prefs.ChatModel = "gemma2-9b-it";
         Check("prefs chatModel round-trip and active", Prefs.ChatModel == "gemma2-9b-it" && Prefs.ActiveChatModel == "gemma2-9b-it");
         Prefs.ChatModel = "qwen/qwen3-32b";   // retired → migrated to auto on read
         Check("prefs migrates retired chat model", Prefs.ChatModel == ChatModels.Auto);
+        Prefs.ChatModel = "llama-3.3-70b-versatile";   // withdrawn by Groq 2026-08-16
+        Prefs.ResolvedChatModel = "llama-3.3-70b-versatile";
+        Check("prefs migrates the withdrawn llama choice and its cached resolution",
+            Prefs.ChatModel == ChatModels.Auto && Prefs.ResolvedChatModel == ChatModels.Seed
+            && Prefs.ActiveChatModel == ChatModels.Seed);
         Prefs.ChatModel = ChatModels.Auto; Prefs.ResolvedChatModel = "openai/gpt-oss-120b";
         Check("prefs active uses cached resolution", Prefs.ActiveChatModel == "openai/gpt-oss-120b");
         Prefs.ChatModel = savedChat; Prefs.ResolvedChatModel = savedResolved;

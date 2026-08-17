@@ -192,7 +192,9 @@ public sealed class DictationController : IDisposable
                 // fail-open. The state stays Transcribing while this runs.
                 if (Prefs.LlmPostProcess && key is not null)
                 {
-                    finalText = await GroqClient.PostProcessAsync(finalText, key, Prefs.Vocabulary);
+                    // A 403 (model blocked for the Groq org) is reported once per model per
+                    // session — it cannot heal itself, unlike a 404 (spec §6.1).
+                    finalText = await GroqClient.PostProcessAsync(finalText, key, Prefs.Vocabulary, RaiseNotice);
                     if (finalText != result.Text)
                         Log.Info($"llm post-process: corrected ({result.Text.Length} → {finalText.Length} chars)");
                     else

@@ -187,8 +187,17 @@ public static class Prefs
         set { lock (Gate) { _data.ChatModel = string.IsNullOrWhiteSpace(value) ? ChatModels.Auto : value; Save(); } }
     }
 
-    /// <summary>Models Groq has withdrawn; a saved choice pointing at one falls back to "auto".</summary>
-    private static readonly string[] RetiredChatModels = { "qwen/qwen3-32b" };
+    /// <summary>
+    /// Models Groq has withdrawn; a saved choice pointing at one falls back to "auto" and a cached
+    /// resolution falls back to the seed (spec §6.1). The list is maintained by hand and grows as
+    /// models are retired — self-healing on a 404 is not enough on its own, or a user whose manual
+    /// pick is dead would pay one failed request on every single dictation.
+    /// </summary>
+    private static readonly string[] RetiredChatModels =
+    {
+        "qwen/qwen3-32b",
+        "llama-3.3-70b-versatile",   // withdrawn by Groq 2026-08-16
+    };
 
     /// <summary>Last successfully resolved chat model — used offline and on first run (spec §6.1).</summary>
     public static string ResolvedChatModel

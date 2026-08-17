@@ -211,25 +211,46 @@ public static class GroqClient
     /// blocks dictation. A 404 (model retired by Groq) re-resolves the model and retries once, so
     /// the app heals itself without a release.
     /// </summary>
+    /// <param name="notify">
+    /// Receives a user-facing message when the model is blocked for the org (403). Unlike a 404,
+    /// this cannot heal itself — the model is alive, the access is missing — so staying silent
+    /// would make correction fail on every dictation with no explanation (spec §6.1).
+    /// </param>
     public static async Task<string> PostProcessAsync(string text, string apiKey, string? vocabulary,
-        CancellationToken cancellationToken = default)
+        Action<string>? notify = null, CancellationToken cancellationToken = default)
     {
         var prompt = PostProcessPromptText(text, vocabulary);
         if (prompt is null) return text;
 
-        var (result, notFound) = await TryPostProcessAsync(text, apiKey, prompt, Prefs.ActiveChatModel, cancellationToken);
-        if (!notFound) return result;
+        var active = Prefs.ActiveChatModel;
+        var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, active, cancellationToken);
+        if (status == 403) { ReportBlocked(active, notify); return result; }
+        if (status != 404) return result;
 
         // Model gone → refresh the resolution and retry once with whatever is available now.
         Log.Info("chat model returned 404 — re-resolving");
         var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
-        if (resolved is null || resolved == Prefs.ActiveChatModel) return text;
+        if (resolved is null || resolved == active) return text;
 
-        var (retry, _) = await TryPostProcessAsync(text, apiKey, prompt, resolved, cancellationToken);
+        var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, resolved, cancellationToken);
+        if (retryStatus == 403) ReportBlocked(resolved, notify);
         return retry;
     }
 
-    private static async Task<(string Text, bool NotFound)> TryPostProcessAsync(
+    /// <summary>Models already reported as blocked — at most one notice per model per session.</summary>
+    private static readonly HashSet<string> BlockedReported = new(StringComparer.OrdinalIgnoreCase);
+
+    private static void ReportBlocked(string model, Action<string>? notify)
+    {
+        lock (BlockedReported)
+            if (!BlockedReported.Add(model)) return;
+
+        Log.Error($"chat model {model} is blocked for this Groq org (403)");
+        notify?.Invoke(string.Format(S.LlmBlockedFmt, model));
+    }
+
+    /// <summary>Runs one correction request; Status is the HTTP code, or 0 when we failed open.</summary>
+    private static async Task<(string Text, int Status)> TryPostProcessAsync(
         string text, string apiKey, string prompt, string model, CancellationToken cancellationToken)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -240,19 +261,19 @@ public static class GroqClient
             using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096, model);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
             if (!response.IsSuccessStatusCode)
-                return (text, (int)response.StatusCode == 404);
+                return (text, (int)response.StatusCode);
 
             var body = await response.Content.ReadAsStringAsync(cts.Token);
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
-                return (text, false);
+                return (text, 0);
             var content = choices[0].GetProperty("message").GetProperty("content").GetString();
             var cleaned = (content ?? string.Empty).Trim();
-            return (cleaned.Length == 0 ? text : cleaned, false);
+            return (cleaned.Length == 0 ? text : cleaned, 0);
         }
         catch
         {
-            return (text, false);   // fail-open (spec §6.1)
+            return (text, 0);   // fail-open (spec §6.1)
         }
     }
 
