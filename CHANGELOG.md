@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-08-17
+
+### Fixed
+- **AI term correction pointed at a model Groq had withdrawn.** `llama-3.3-70b-versatile` was
+  retired on 2026-08-16, and it was both the head of our priority chain and the seed used on a
+  first run or offline — so correction aimed at a dead model, and a cached resolution pointing at
+  it cost one failed request per dictation before healing itself. The chain is now
+  `openai/gpt-oss-120b` → `qwen/qwen3.6-27b` → `openai/gpt-oss-20b` → `llama-3.1-8b-instant`, and
+  a saved manual choice of the withdrawn model falls back to "auto" with its cached resolution
+  falling back to the seed (spec §6.1). Dictation itself was never affected — correction fails
+  open and delivers the original text.
+
+### Added
+- **A blocked correction model is no longer silent.** If Groq answers 403 (the model is not
+  allowed for your organization) during a dictation, Voica says so once per model per session,
+  naming the model and pointing at console.groq.com → Settings → Limits. Unlike a retired model
+  (404), this cannot heal itself, so silence made the feature look broken.
+
+### Changed
+- `groq/compound` and `compound-mini` are no longer used for correction: they are agentic systems
+  with their own routing and tools — an extra layer for one short term fix, and they route to
+  models an organization may not have.
+
 ## [0.6.1] - 2026-08-14
 
 ### Fixed
