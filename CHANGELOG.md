@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-08-19
+
+### Added
+- **An installer.** `Voica-Setup-<version>.exe` joins the two bare executables on the release page
+  and is now the recommended download: it carries the self-contained build, so there is no longer a
+  choice to make between `Voica.exe` and `Voica-fx.exe` — a choice that required knowing whether the
+  .NET 8 Desktop Runtime was installed. It sets Voica up for the current user
+  (`%LocalAppData%\Programs\Voica`), so **no UAC prompt**, adds a Start-menu entry and a proper
+  uninstall record, offers to close a running copy when installing over it, and leaves history,
+  settings and the API key untouched on uninstall.
+
+### Fixed
+- **Reasoning models leaked their train of thought into the dictated text** (spec §6.1). Some chat
+  models return their reasoning inside `content`, wrapped in `<think>…</think>`, with the answer
+  after it — and all of it was delivered to you instead of your dictation. Not a corner case:
+  `qwen/qwen3.6-27b` is the second link of the correction chain, so anyone whose
+  `openai/gpt-oss-120b` is blocked for their Groq organization hit this on every dictation. Voica
+  now strips those blocks (any case, attributes, several blocks, and an unclosed one — which means
+  the answer was cut off mid-thought). Measured against the live model: 3800–11500 characters of
+  reasoning removed per answer.
+- **A rambling answer no longer replaces your text.** Term correction swaps individual words, so an
+  answer that is empty or more than twice the original length is treated as the model going off the
+  rails and the original text is delivered (spec §6.1).
+- **`allam-2-7b` is no longer used for correction.** The live model list comes back alphabetically
+  and the last-resort pick is the first entry, so an Arabic model was quietly becoming the fallback
+  for correcting Russian terms.
+- **`--test-all` no longer touches your settings.** The self-test mutates real settings and restored
+  them one field at a time, which missed several — including "AI term correction", which it switched
+  off behind your back on every run. It now snapshots all settings and restores them whatever
+  happens.
+
+### Changed
+- The hint under the language picker says auto-detect covers about a hundred languages: the three
+  entries (auto / Russian / English) were reading as the full list of what Voica understands (§2).
+
 ## [0.6.2] - 2026-08-17
 
 ### Fixed

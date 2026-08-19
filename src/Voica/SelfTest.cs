@@ -23,6 +23,13 @@ public static class SelfTest
 
         Console.WriteLine("Voica self-test");
 
+        // The suite mutates the real settings file, so take a whole-settings snapshot and put it
+        // back whatever happens — restoring field by field is what let AI correction get switched
+        // off behind the user's back.
+        var settingsSnapshot = Prefs.Snapshot();
+        try
+        {
+
         // --- AppInfo / version ---
         Check("version parses to 3+ components",
             AppInfo.Version.Split('.').Length >= 3 && AppInfo.Version != "0.0.0");
@@ -447,5 +454,10 @@ public static class SelfTest
 
         Console.WriteLine($"Result: {passed} passed, {failed} failed");
         return failed == 0;
+        }
+        finally
+        {
+            Prefs.Restore(settingsSnapshot);
+        }
     }
 }

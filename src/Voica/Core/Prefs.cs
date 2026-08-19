@@ -240,6 +240,29 @@ public static class Prefs
         set { lock (Gate) { _data.ShowOverlay = value; Save(); } }
     }
 
+    /// <summary>
+    /// Serializes every setting — used by the self-test, which mutates real settings and must put
+    /// them back. Field-by-field restore was tried and failed: Reset() clears 18 settings while the
+    /// test remembered 12, so each run silently switched AI correction off on the user's machine.
+    /// A whole-object snapshot has nothing to forget.
+    /// </summary>
+    public static string Snapshot()
+    {
+        lock (Gate) return JsonSerializer.Serialize(_data, JsonOptions);
+    }
+
+    /// <summary>Restores a <see cref="Snapshot"/>, in memory and on disk.</summary>
+    public static void Restore(string snapshot)
+    {
+        lock (Gate)
+        {
+            var data = JsonSerializer.Deserialize<Data>(snapshot, JsonOptions);
+            if (data is null) return;
+            _data = data;
+            Save();
+        }
+    }
+
     /// <summary>Resets all settings to defaults (for Delete all data, spec §11).</summary>
     public static void Reset()
     {
