@@ -83,6 +83,15 @@ public static class SelfTest
         // Groq's agentic systems are not chat models for our purposes (spec §6.1).
         Check("chat denylist filters compound",
             !ChatModels.IsChatModel("groq/compound") && !ChatModels.IsChatModel("compound-mini"));
+        // allam sorts first alphabetically, so without this it becomes the last-resort pick for
+        // correcting Russian terms. The substring must not swallow the meta-llama family.
+        Check("chat denylist filters allam but spares meta-llama",
+            !ChatModels.IsChatModel("allam-2-7b")
+            && ChatModels.IsChatModel("meta-llama/llama-4-scout-17b-16e-instruct")
+            && ChatModels.IsChatModel("llama-3.1-8b-instant"));
+        Check("chat resolve never falls back to allam",
+            ChatModels.Resolve(new[] { "allam-2-7b", "some-new-model" }, ChatModels.Auto) == "some-new-model"
+            && ChatModels.Resolve(new[] { "allam-2-7b" }, ChatModels.Auto) is null);
         Check("chat chain and seed hold only live models",
             ChatModels.Seed == "openai/gpt-oss-120b"
             && ChatModels.PriorityChain[0] == ChatModels.Seed
@@ -124,12 +133,36 @@ public static class SelfTest
             ppPrompt is not null && ppPrompt.Contains("СЛОВАРЬ: kubectl, Kubernetes")
             && ppPrompt.Contains("ТЕКСТ: привет кубер стил"));
 
+        // --- Reasoning cleanup and the plausibility guard (spec §6.1) ---
+        Check("strip removes a plain think block",
+            GroqClient.StripReasoning("<think>размышляю</think>готовый текст") == "готовый текст");
+        Check("strip is case-insensitive and takes attributes",
+            GroqClient.StripReasoning("<Think type=\"x\">хм</THINK> текст") == "текст");
+        Check("strip handles several blocks and newlines inside",
+            GroqClient.StripReasoning("<think>раз\nдва</think>а<think>ещё\nблок</think>б") == "аб");
+        // An unclosed tag means max_completion_tokens cut the answer mid-thought (spec §6.1).
+        Check("strip drops everything after an unclosed tag",
+            GroqClient.StripReasoning("текст <think>думаю и думаю") == "текст");
+        Check("strip leaves an ordinary answer alone",
+            GroqClient.StripReasoning("  привет kubectl  ") == "привет kubectl");
+        // Boundary is measured off the original, not a hardcoded count (spec §6.1: len * 2 + 50).
+        var guardSource = "коротко";
+        Check("plausibility rejects empty and rambling answers",
+            !GroqClient.IsPlausibleCorrection("исходный текст", "")
+            && !GroqClient.IsPlausibleCorrection(guardSource, new string('x', guardSource.Length * 2 + 51)));
+        Check("plausibility accepts a normal correction and the exact limit",
+            GroqClient.IsPlausibleCorrection("привет кубер стил", "привет kubectl")
+            && GroqClient.IsPlausibleCorrection(guardSource, new string('x', guardSource.Length * 2 + 50)));
+
         var savedLlm = Prefs.LlmPostProcess;
         Prefs.LlmPostProcess = !savedLlm;
         Check("prefs llmPostProcess round-trip", Prefs.LlmPostProcess == !savedLlm);
         Prefs.LlmPostProcess = savedLlm;
 
         // --- Reset-settings semantics (spec §11): vocabulary is user content, survives reset ---
+        // Reset wipes the chat model and its cached resolution too, so snapshot both — otherwise
+        // running the self-test silently drops a model the user picked by hand (spec §6.1).
+        var rsChat = Prefs.ChatModel; var rsResolved = Prefs.ResolvedChatModel;
         var rsVocab = Prefs.Vocabulary; var rsLlm = Prefs.LlmPostProcess; var rsDays = Prefs.RetentionDays;
         Prefs.Vocabulary = "__voica_reset_test__"; Prefs.LlmPostProcess = true; Prefs.RetentionDays = 7;
         var keepVocab = Prefs.Vocabulary;
@@ -137,6 +170,7 @@ public static class SelfTest
         Check("reset-settings keeps vocabulary, resets the rest",
             Prefs.Vocabulary == "__voica_reset_test__" && !Prefs.LlmPostProcess && Prefs.RetentionDays == 30);
         Prefs.Vocabulary = rsVocab; Prefs.LlmPostProcess = rsLlm; Prefs.RetentionDays = rsDays;
+        Prefs.ChatModel = rsChat; Prefs.ResolvedChatModel = rsResolved;
 
         // --- Local engine (spec §2.5): pure logic, no model file needed ---
         Check("mel frame count", MelFrontend.FrameCount(16000) == (16000 - 320) / 160 + 1);
@@ -329,6 +363,7 @@ public static class SelfTest
         var snapVocab2 = Prefs.Vocabulary; var snapCheck = Prefs.CheckUpdatesOnLaunch;
         var snapOverlay = Prefs.ShowOverlay; var snapTap = Prefs.DoubleTapToStart;
         var snapNotify = Prefs.NotifyOnInsert;
+        var snapChat = Prefs.ChatModel; var snapResolved = Prefs.ResolvedChatModel;
         Prefs.Reset();
         Check("reset yields windows defaults",
             Prefs.Mode == DictationMode.Toggle && Prefs.Hotkey == HotkeyBinding.Default
@@ -342,6 +377,7 @@ public static class SelfTest
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;
         Prefs.ShowOverlay = snapOverlay; Prefs.DoubleTapToStart = snapTap;
         Prefs.NotifyOnInsert = snapNotify;
+        Prefs.ChatModel = snapChat; Prefs.ResolvedChatModel = snapResolved;
 
         // --- KeyStore round-trip (restore the exact original file, if any) ---
         var savedKey = KeyStore.Load();

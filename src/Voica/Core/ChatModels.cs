@@ -42,10 +42,16 @@ public static class ChatModels
     /// chat families work without an app update. <c>compound</c> is excluded for a different
     /// reason (spec §6.1): those are Groq's agentic systems with their own routing and tools —
     /// an extra layer for one short term fix, and they route to models the org may not have.
+    /// <c>allam</c> is excluded for a third reason: it is an Arabic model, and since the live list
+    /// comes back alphabetically while the last-resort pick is simply the first entry,
+    /// <c>allam-2-7b</c> would quietly become the fallback for correcting RUSSIAN terms. If Arabic
+    /// is ever asked for, bring it back and pick the fallback by language rather than by alphabet.
+    /// The match is a substring, so the self-test guards that it does not catch <c>meta-llama</c>
+    /// (which reads "a-llama", not "allam").
     /// </summary>
     private static readonly string[] Denylist =
     {
-        "whisper", "tts", "orpheus", "guard", "embed", "moderation", "distil", "compound",
+        "whisper", "tts", "orpheus", "guard", "embed", "moderation", "distil", "compound", "allam",
     };
 
     /// <summary>True if a model id looks like a usable chat model.</summary>

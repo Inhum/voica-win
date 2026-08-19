@@ -130,8 +130,8 @@ public static class S
     public static string LangRu => Loc.T("Russian", "Русский");
     public static string LangEn => Loc.T("English", "Английский");
     public static string SttHint => Loc.T(
-        "Applies to the cloud engine only (the local engine is Russian-only). Forcing a language helps with short phrases that auto-detect gets wrong.",
-        "Действует только для облачного движка (локальный — русскоязычный). Жёсткий выбор языка помогает с короткими фразами, где автоопределение ошибается.");
+        "Auto-detect covers about a hundred languages, not just these two — Russian and English are listed separately only because forcing one helps with short phrases that auto-detect reads wrong. Applies to the cloud engine only (the local engine is Russian-only).",
+        "Автоопределение понимает около сотни языков, а не только эти два — русский и английский вынесены отдельно лишь потому, что жёсткий выбор помогает с короткими фразами, где автоопределение ошибается. Действует только для облачного движка (локальный — русскоязычный).");
 
     public static string ChkDoubleTap => Loc.T("Double-tap to start", "Двойной тап — старт");
     public static string LblCloudSection => Loc.T("Cloud recognition", "Облачное распознавание");

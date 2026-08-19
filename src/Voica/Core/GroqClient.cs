@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -267,15 +268,51 @@ public static class GroqClient
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
                 return (text, 0);
-            var content = choices[0].GetProperty("message").GetProperty("content").GetString();
-            var cleaned = (content ?? string.Empty).Trim();
-            return (cleaned.Length == 0 ? text : cleaned, 0);
+            var raw = (choices[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty).Trim();
+            var cleaned = StripReasoning(raw);
+            if (cleaned.Length != raw.Length)
+                Log.Info($"chat answer carried reasoning — stripped {raw.Length - cleaned.Length} chars ({model})");
+            if (!IsPlausibleCorrection(text, cleaned))
+            {
+                Log.Info($"chat answer rejected as implausible ({cleaned.Length} chars for {text.Length}) — keeping the original");
+                return (text, 0);
+            }
+            return (cleaned, 0);
         }
         catch
         {
             return (text, 0);   // fail-open (spec §6.1)
         }
     }
+
+    // Reasoning models put their train of thought into `content` itself, wrapped in <think>...</think>,
+    // with the actual answer after it. Provider-side switches (reasoning_format and friends) are not
+    // an option: they are specific to one API and a model without reasoning can answer 400, which by
+    // fail-open would silently drop the correction for EVERY model. So we clean it up ourselves.
+    private static readonly Regex ThinkBlock =
+        new(@"<think[^>]*>.*?</think>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // An unclosed tag means the answer was cut off by max_completion_tokens mid-thought — nothing
+    // useful follows, so everything from the tag on goes.
+    private static readonly Regex ThinkOpen =
+        new(@"<think[^>]*>.*", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Removes reasoning blocks from a chat answer (spec §6.1): every <c>&lt;think&gt;...&lt;/think&gt;</c>
+    /// regardless of case or attributes, then any unclosed opener through the end. Mirrors
+    /// <c>GroqClient.stripReasoning</c> in the macOS app.
+    /// </summary>
+    public static string StripReasoning(string content) =>
+        ThinkOpen.Replace(ThinkBlock.Replace(content, string.Empty), string.Empty).Trim();
+
+    /// <summary>
+    /// Sanity check on a correction (spec §6.1): term fixing swaps individual words, so the answer
+    /// cannot be wildly longer than the original. Empty, or longer than <c>original * 2 + 50</c>,
+    /// means the model rambled — the caller then delivers the original text. This is the second line
+    /// behind fail-open: it catches any chatty model, not just the &lt;think&gt; format.
+    /// </summary>
+    public static bool IsPlausibleCorrection(string original, string cleaned) =>
+        cleaned.Length > 0 && cleaned.Length <= original.Length * 2 + 50;
 
     /// <summary>
     /// Re-resolves the chat model from the live list and caches it (spec §6.1 self-healing).
