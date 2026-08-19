@@ -98,14 +98,26 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 
 ## Install
 
-Download from the [latest release](https://github.com/Inhum/voica-win/releases/latest) and run it —
-no installer needed:
+Take the installer from the [latest release](https://github.com/Inhum/voica-win/releases/latest):
+
+- **`Voica-Setup-<version>.exe`** — the normal way in. It carries the self‑contained build, so
+  there is nothing to choose and nothing else to install. It sets Voica up **for your user only**
+  (`%LocalAppData%\Programs\Voica`), which means **no UAC prompt**, adds a Start‑menu entry, and
+  registers a proper uninstall record. Installing over a running copy offers to close it first.
+  Uninstalling removes the program but **keeps your data** — history, settings and the API key stay
+  in `%APPDATA%\Voica` (wiping those is the app's own *Delete all data*, which asks you to type a
+  confirmation).
+
+The two bare executables stay on the release page for anyone who prefers to run one file with no
+installation at all — you just have to know which:
 
 - **`Voica.exe`** (~80 MB) — fully self‑contained, nothing else to install.
 - **`Voica-fx.exe`** (~37 MB) — smaller, but needs the
   [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) installed once.
 
-Voica runs in the system tray (no main window). See below about the SmartScreen warning.
+Either way Voica runs in the system tray (no main window), and either way your data lives in
+`%APPDATA%\Voica`, so you can switch between them without losing anything. See below about the
+SmartScreen warning — it applies to the installer too.
 
 ## Why does Windows warn about this app?
 
