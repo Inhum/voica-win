@@ -43,10 +43,13 @@ MinVersion=10.0.17763
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-; The app holds this mutex for single-instance enforcement (App.xaml.cs). Inno uses it to notice
-; a running copy and offer to close it — without this the install fails on a locked exe.
-AppMutex=Voica.SingleInstance.Mutex
+; Installing over a running copy: let the Restart Manager find and close it. Voica is tray-only,
+; so it must not be AppMutex — that check fires first and only puts up a "close all instances of it
+; now" box, leaving the user to hunt for a window that does not exist, and failing outright on a
+; silent install. CloseApplications spots the process through the file it locks and closes it
+; itself, showing the standard "applications are using files" page in the wizard.
 CloseApplications=yes
+CloseApplicationsFilter=*.exe
 RestartApplications=no
 
 OutputDir=..\out\installer

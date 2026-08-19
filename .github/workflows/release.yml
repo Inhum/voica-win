@@ -42,8 +42,16 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
+          # Find the compiler instead of hardcoding "Inno Setup 6": the package tracks upstream,
+          # which now also ships a 7.x line that installs into its own directory (and the x64
+          # build lands under Program Files, not Program Files (x86)).
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup *", "C:\Program Files\Inno Setup *" `
+                    -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue |
+                  Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup" }
+          Write-Host "compiler: $($iscc.FullName)"
           $version = "${{ github.ref_name }}" -replace '^v', ''
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$version installer\voica.iss
+          & $iscc.FullName /DAppVersion=$version installer\voica.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Stage assets
@@ -54,6 +62,11 @@ jobs:
           Copy-Item out/self/Voica.exe out/assets/Voica.exe
           Copy-Item out/fx/Voica.exe out/assets/Voica-fx.exe
           Copy-Item "out/installer/Voica-Setup-$version.exe" out/assets/
+          # A missing asset must fail the job here: Copy-Item alone would only write an error and
+          # the release would be published without the installer.
+          foreach ($name in @("Voica.exe", "Voica-fx.exe", "Voica-Setup-$version.exe")) {
+            if (-not (Test-Path "out/assets/$name")) { throw "missing release asset: $name" }
+          }
           Get-ChildItem out/assets | Select-Object Name, Length
 
       - name: Create GitHub Release

@@ -2,6 +2,7 @@
 bin/
 obj/
 publish/
+out/
 *.user
 
 # Rider / VS
