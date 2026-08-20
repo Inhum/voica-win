@@ -24,6 +24,7 @@ public sealed class Recorder : IDisposable
     private DateTime _startUtc;
     private TaskCompletionSource<bool>? _stopped;
     private double _level;
+    private DateTime? _firstSampleUtc;
 
     public bool IsRecording => _waveIn is not null;
 
@@ -47,9 +48,17 @@ public sealed class Recorder : IDisposable
         _waveIn.RecordingStopped += OnRecordingStopped;
         _stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _startUtc = DateTime.UtcNow;
+        _firstSampleUtc = null;
         System.Threading.Volatile.Write(ref _level, 0);
 
         _waveIn.StartRecording();
+        // Name the device: when capture misbehaves, the first question is always which mic ran.
+        try
+        {
+            var caps = WaveInEvent.GetCapabilities(_waveIn.DeviceNumber);
+            Log.Info($"mic: {caps.ProductName} (device {_waveIn.DeviceNumber})");
+        }
+        catch { /* diagnostics only */ }
     }
 
     /// <summary>
@@ -61,6 +70,7 @@ public sealed class Recorder : IDisposable
         if (_waveIn is null) return null;
 
         var waveIn = _waveIn;
+        var stopRequestedUtc = DateTime.UtcNow;
         waveIn.StopRecording();
         await (_stopped?.Task ?? Task.CompletedTask);
 
@@ -84,6 +94,19 @@ public sealed class Recorder : IDisposable
         catch
         {
             // Fall back to wall-clock duration if the file can't be reopened.
+        }
+
+        // A short file has three very different causes, and "no speech" hides all of them: the
+        // device started delivering late, it dropped buffers mid-way, or the recording was stopped
+        // sooner than the user thinks. Split them apart so the log names the culprit.
+        double held = (DateTime.UtcNow - _startUtc).TotalSeconds;
+        if (held - duration > 0.75)
+        {
+            double startLag = _firstSampleUtc is { } first ? (first - _startUtc).TotalSeconds : held;
+            double stopCost = (DateTime.UtcNow - stopRequestedUtc).TotalSeconds;
+            double midGap = held - duration - startLag - stopCost;
+            Log.Error($"mic short: wrote {duration:0.00}s over {held:0.00}s — " +
+                      $"first sample after {startLag:0.00}s, stop took {stopCost:0.00}s, unaccounted {midGap:0.00}s");
         }
 
         if (duration < MinDurationSeconds)
@@ -118,6 +141,7 @@ public sealed class Recorder : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
+        _firstSampleUtc ??= DateTime.UtcNow;
         _writer?.Write(e.Buffer, 0, e.BytesRecorded);
         UpdateLevel(e.Buffer, e.BytesRecorded);
     }

@@ -28,6 +28,9 @@ AppPublisherURL={#AppURL}
 AppSupportURL=https://github.com/Inhum/voica-win
 AppUpdatesURL=https://github.com/Inhum/voica-win/releases
 VersionInfoVersion={#AppVersion}
+; Without these the setup's Details tab shows an empty Copyright; text matches Voica.csproj.
+AppCopyright=Copyright (c) 2026 Ivan Ushakov
+VersionInfoCopyright=Copyright (c) 2026 Ivan Ushakov
 
 ; Per-user install: {autopf} resolves to {localappdata}\Programs under PrivilegesRequired=lowest,
 ; which keeps UAC out of the picture entirely. An unsigned installer asking for elevation shows
