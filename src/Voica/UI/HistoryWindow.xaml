@@ -3,10 +3,18 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Voica"
         xmlns:ui="clr-namespace:Voica.UI"
-        Title="{x:Static l:S.HistoryTitle}" Width="720" Height="480"
+        Title="{x:Static l:S.HistoryTitle}" Width="880" Height="460"
+        MinWidth="600" MinHeight="320"
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnWindowKeyDown">
+    <!-- Layout mirrors the macOS window (spec §7): the list on the left, the record's text on the
+         right. A one-column list cannot show a dictation longer than a sentence. -->
     <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -14,73 +22,71 @@
         </Grid.RowDefinitions>
 
         <!-- Search over the list (spec §7): filters text AND raw_text, on a typing pause. -->
-        <DockPanel Margin="0,0,0,8">
-            <TextBlock x:Name="SearchInfo" DockPanel.Dock="Right" VerticalAlignment="Center"
-                       Margin="12,0,0,0" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-            <Grid HorizontalAlignment="Left" Width="250">
-                <TextBox x:Name="SearchBox" Height="26" VerticalContentAlignment="Center"
-                         TextChanged="OnSearchTextChanged" />
-                <!-- WPF has no placeholder: a label behind the box, hidden as soon as it is typed in. -->
-                <TextBlock x:Name="SearchPlaceholder" Text="{x:Static l:S.HistSearch}" IsHitTestVisible="False"
-                           VerticalAlignment="Center" Margin="6,0,0,0" Opacity="0.5" />
-            </Grid>
-        </DockPanel>
+        <Grid Grid.Row="0" Grid.Column="0">
+            <TextBox x:Name="SearchBox" Height="26" VerticalContentAlignment="Center"
+                     TextChanged="OnSearchTextChanged" />
+            <!-- WPF has no placeholder: a label behind the box, hidden as soon as it is typed in. -->
+            <TextBlock x:Name="SearchPlaceholder" Text="{x:Static l:S.HistSearch}" IsHitTestVisible="False"
+                       VerticalAlignment="Center" Margin="6,0,0,0" Opacity="0.5" />
+        </Grid>
+        <!-- The search summary sits at the level of the field, above the text: the bottom line is
+             taken by the record's metadata, and on a narrow window one would clip the other. -->
+        <TextBlock x:Name="SearchInfo" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center"
+                   Margin="2,0,0,0" FontSize="11" Opacity="0.7" TextTrimming="CharacterEllipsis" />
 
-        <DataGrid x:Name="Grid" Grid.Row="1"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  SelectionMode="Extended"
-                  GridLinesVisibility="Horizontal"
-                  CanUserResizeRows="False"
-                  MouseDoubleClick="OnCopy"
-                  SelectionChanged="OnSelectionChanged"
-                  PreviewKeyDown="OnGridKeyDown">
-            <DataGrid.ContextMenu>
+        <ListBox x:Name="List" Grid.Row="1" Grid.Column="0" Margin="0,8,0,10"
+                 SelectionMode="Extended"
+                 HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 SelectionChanged="OnSelectionChanged"
+                 MouseDoubleClick="OnCopy"
+                 PreviewKeyDown="OnListKeyDown">
+            <ListBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="{x:Static l:S.BtnCopy}" Click="OnCopy" />
                     <MenuItem x:Name="PlayMenuItem" Header="{x:Static l:S.BtnPlay}" Click="OnPlay" />
                     <Separator />
                     <MenuItem Header="{x:Static l:S.BtnDelete}" Click="OnDelete" />
                 </ContextMenu>
-            </DataGrid.ContextMenu>
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="{x:Static l:S.ColWhen}" Binding="{Binding When}" Width="150" />
-                <!-- The text carries the search highlight, and the engine's own words when the
-                     record answered only through them (spec §7). -->
-                <DataGridTemplateColumn Header="{x:Static l:S.ColText}" Width="*">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,3">
-                                <TextBlock TextTrimming="CharacterEllipsis"
-                                           ui:Highlight.Text="{Binding Preview}"
-                                           ui:Highlight.Query="{Binding Query}" />
-                                <DockPanel Visibility="{Binding RawVisibility}" Margin="0,2,0,0" Opacity="0.65">
-                                    <TextBlock DockPanel.Dock="Left" FontSize="11" Margin="0,0,4,0"
-                                               Text="{x:Static l:S.HistSearchRawPrefix}" />
-                                    <TextBlock FontSize="11" TextTrimming="CharacterEllipsis"
-                                               ui:Highlight.Text="{Binding RawPreview}"
-                                               ui:Highlight.Query="{Binding Query}" />
-                                </DockPanel>
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn Header="{x:Static l:S.ColLang}" Binding="{Binding Lang}" Width="70" />
-                <DataGridTextColumn Header="{x:Static l:S.ColDur}" Binding="{Binding Duration}" Width="60" />
-                <DataGridTextColumn Header="{x:Static l:S.ColModel}" Binding="{Binding ModelName}" Width="150" />
-                <DataGridTextColumn Header="{x:Static l:S.ColAudio}" Binding="{Binding AudioMark}" Width="55" />
-            </DataGrid.Columns>
-        </DataGrid>
+            </ListBox.ContextMenu>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="2,3">
+                        <TextBlock Text="{Binding When}" FontSize="11" Opacity="0.65" />
+                        <TextBlock TextWrapping="Wrap" MaxHeight="34" Margin="0,1,0,0"
+                                   ui:Highlight.Text="{Binding Preview}"
+                                   ui:Highlight.Query="{Binding Query}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
-            <Button x:Name="CopyButton" Content="{x:Static l:S.BtnCopy}" Width="90" Height="28" Margin="0,0,8,0" Click="OnCopy" />
-            <Button x:Name="PlayButton" Content="{x:Static l:S.BtnPlay}" Width="90" Height="28" Margin="0,0,8,0" Click="OnPlay" />
-            <Button x:Name="DeleteButton" Content="{x:Static l:S.BtnDelete}" Width="90" Height="28" Margin="0,0,8,0" Click="OnDelete" />
-            <Button Content="{x:Static l:S.BtnRefresh}" Width="90" Height="28" Margin="0,0,8,0" Click="OnRefresh" />
-            <!-- Whole-history action (spec §7), separate from the per-record buttons above. -->
-            <Button x:Name="ExportButton" Content="{x:Static l:S.BtnExport}" Width="90" Height="28" Margin="16,0,8,0" Click="OnExport" />
-            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="8,0,0,0" Opacity="0.7" />
+        <Grid Grid.Row="1" Grid.Column="2" Margin="0,8,0,10">
+            <RichTextBox x:Name="Detail" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                         FontSize="14" Padding="6,8,6,8"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" />
+            <!-- An empty history and an empty result are different states (spec §7). -->
+            <TextBlock x:Name="EmptyLabel" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Opacity="0.5" IsHitTestVisible="False" Visibility="Collapsed" />
+        </Grid>
+
+        <!-- Whole-history action (spec §7), so it stands under the list, apart from the per-record
+             buttons on the right. -->
+        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal">
+            <Button x:Name="ExportButton" Content="{x:Static l:S.BtnExport}" Width="90" Height="28"
+                    Margin="0,0,8,0" Click="OnExport" />
+            <Button Content="{x:Static l:S.BtnRefresh}" Width="90" Height="28" Click="OnRefresh" />
         </StackPanel>
+
+        <DockPanel Grid.Row="2" Grid.Column="2">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="CopyButton" Content="{x:Static l:S.BtnCopy}" Width="90" Height="28" Margin="8,0,0,0" Click="OnCopy" />
+                <Button x:Name="PlayButton" Content="{x:Static l:S.BtnPlay}" Width="90" Height="28" Margin="8,0,0,0" Click="OnPlay" />
+                <Button x:Name="DeleteButton" Content="{x:Static l:S.BtnDelete}" Width="90" Height="28" Margin="8,0,0,0" Click="OnDelete" />
+            </StackPanel>
+            <!-- The record's metadata, and transient messages ("Copied", "Playing…") over it. -->
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="2,0,0,0"
+                       FontSize="11" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
     </Grid>
 </Window>

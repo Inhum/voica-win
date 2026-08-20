@@ -232,7 +232,7 @@ public static class S
     // states and must not share a message.
     public static string HistSearch => Loc.T("Search text", "Поиск по тексту");
     public static string HistSearchNone => Loc.T("Nothing found", "Ничего не найдено");
-    public static string HistSearchFoundFmt => Loc.T("Found: {0} of {1}.", "Найдено: {0} из {1}.");
+    public static string HistSearchMatchesFmt => Loc.T("matches: {0}", "совпадений: {0}");
     public static string HistSearchInRaw => Loc.T("found in the original text", "найдено в исходном тексте");
     public static string HistSearchRawPrefix => Loc.T("Original, before fixing:", "Исходно, до исправления:");
     public static string HistCopied => Loc.T("Copied to clipboard.", "Скопировано в буфер.");

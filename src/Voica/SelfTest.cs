@@ -166,6 +166,14 @@ public static class SelfTest
             && HistorySearch.MatchRanges(null, "текст").Count == 0
             && HistorySearch.MatchRanges("текст", "нет").Count == 0);
 
+        // The metadata line under the record's text: empty parts are skipped, not shown blank.
+        var metaParts = HistoryFormat.MetaLine(
+            new Transcription(1, DateTimeOffset.UnixEpoch, "t", "ru", 3.25, null, "gigaam-v3")).Split(" · ");
+        Check("meta line joins what the record has",
+            metaParts.Length == 4 && metaParts[1] == "ru" && metaParts[3] == "gigaam-v3"
+            && !HistoryFormat.MetaLine(new Transcription(1, DateTimeOffset.UnixEpoch, "t", null, null, null, "  "))
+                .Contains('·'));
+
         Check("a raw-only match is reported as such",
             HistorySearch.MatchedOnlyInRaw(searchRows[0], "клодкод")
             && !HistorySearch.MatchedOnlyInRaw(searchRows[0], "Claude")

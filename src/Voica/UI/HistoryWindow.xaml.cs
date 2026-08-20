@@ -4,18 +4,19 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using NAudio.Wave;
 
 namespace Voica.UI;
 
 /// <summary>
-/// History window (spec §7): lists transcriptions (newest first) with re-copy, audio playback,
-/// and deletion.
+/// History window (spec §7): the list of transcriptions on the left (newest first), the selected
+/// record's text on the right, with re-copy, audio playback, deletion, search and export.
 /// </summary>
 public partial class HistoryWindow : Window
 {
-    /// <summary>Row view-model wrapping a <see cref="Transcription"/> for display.</summary>
+    /// <summary>Row view-model wrapping a <see cref="Transcription"/> for the list.</summary>
     public sealed class Row
     {
         public required Transcription Item { get; init; }
@@ -24,31 +25,13 @@ public partial class HistoryWindow : Window
         public string Query { get; init; } = "";
 
         public string When => Item.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm");
-        public string Preview => OneLine(Item.Text);
-
-        /// <summary>
-        /// The engine's own words, shown under the text when the row answered the query only through
-        /// them: otherwise the row displays a text without the searched word and reads as a bug.
-        /// Highlighting the corresponding part of the final text instead is not possible — after an
-        /// AI correction there is no correspondence, the model rewrites whole phrases.
-        /// </summary>
-        public string RawPreview => OneLine(Item.RawText ?? "");
-
-        public Visibility RawVisibility => HistorySearch.MatchedOnlyInRaw(Item, Query)
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-
-        private static string OneLine(string s) => s.Replace("\r", " ").Replace("\n", " ");
-        public string Lang => Item.Language ?? "";
-        public string Duration => Item.Duration is { } d ? $"{d:0.0}s" : "";
-        public string ModelName => Item.Model ?? "";
-        public string AudioMark => Item.AudioPath is not null && File.Exists(Item.AudioPath) ? "♪" : "";
+        public string Preview => Item.Text.Replace("\r", " ").Replace("\n", " ");
     }
 
     private WaveOutEvent? _output;
     private AudioFileReader? _reader;
 
-    /// <summary>The whole history as loaded; the grid shows what the search leaves of it (spec §7).</summary>
+    /// <summary>The whole history as loaded; the list shows what the search leaves of it (spec §7).</summary>
     private IReadOnlyList<Transcription> _all = Array.Empty<Transcription>();
 
     /// <summary>Filtering runs on a typing pause, not on every letter (spec §7).</summary>
@@ -80,10 +63,12 @@ public partial class HistoryWindow : Window
     {
         var q = Query;
         var rows = HistorySearch.Filter(_all, q).Select(t => new Row { Item = t, Query = q }).ToList();
-        Grid.ItemsSource = rows;
-        if (rows.Count > 0 && Grid.SelectedIndex < 0) Grid.SelectedIndex = 0;
-        ResetStatus();
-        UpdateSearchInfo();
+        List.ItemsSource = rows;
+        if (rows.Count > 0) List.SelectedIndex = 0;
+
+        EmptyLabel.Text = _all.Count == 0 ? S.HistEmpty : S.HistSearchNone;
+        EmptyLabel.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateDetail();
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
@@ -94,8 +79,9 @@ public partial class HistoryWindow : Window
     }
 
     /// <summary>
-    /// Ctrl+F puts the caret in the search box — without it the field has to be found with the
-    /// mouse. Escape clears the query, the way a search field is expected to behave.
+    /// Ctrl+F puts the caret in the search box wherever the focus stands — without it the field has
+    /// to be found with the mouse. Escape clears the query, the way a search field is expected to
+    /// behave.
     /// </summary>
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
@@ -114,16 +100,84 @@ public partial class HistoryWindow : Window
         }
     }
 
-    /// <summary>
-    /// Says when the selected record answers the query only through the engine's raw text (spec §7):
-    /// its shown text then lacks what was typed, which reads as a bug unless it is spelled out.
-    /// </summary>
-    private void UpdateSearchInfo()
+    private void OnListKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Delete && List.SelectedItems.Count > 0)
+        {
+            OnDelete(sender, e);
+            e.Handled = true;
+        }
+    }
+
+    private Transcription? Selected =>
+        List.SelectedItems.Count == 1 ? (List.SelectedItem as Row)?.Item : null;
+
+    /// <summary>All selected records (spec §7: multi-select).</summary>
+    private List<Transcription> SelectedItems =>
+        List.SelectedItems.OfType<Row>().Select(r => r.Item).ToList();
+
+    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateDetail();
+
+    /// <summary>
+    /// Shows the selected record on the right and keeps the buttons honest. With more than one
+    /// record picked, the pane shows a counter and Copy/Play go dark — they only mean something for
+    /// a single record (spec §7).
+    /// </summary>
+    private void UpdateDetail()
+    {
+        int selected = List.SelectedItems.Count;
+        CopyButton.IsEnabled = selected == 1;
+        DeleteButton.IsEnabled = selected >= 1;
+        RefreshPlayButton();
+
+        if (selected == 0)
+        {
+            Detail.Document = new FlowDocument();
+            StatusText.Text = "";
+            SearchInfo.Text = "";
+            return;
+        }
+        if (selected > 1)
+        {
+            var many = string.Format(S.HistSelectedFmt, selected);
+            Detail.Document = Highlight.MutedDocument(many);
+            StatusText.Text = many;
+            SearchInfo.Text = "";
+            return;
+        }
+
+        var record = Selected!;
         var q = Query;
-        SearchInfo.Text = q.Length > 0 && Selected is { } t && HistorySearch.MatchedOnlyInRaw(t, q)
-            ? S.HistSearchInRaw
-            : "";
+        int matches = ShowRecord(record, q);
+        StatusText.Text = HistoryFormat.MetaLine(record);
+
+        // How many hits are in THIS record — on a long dictation only the first one is in view
+        // otherwise, and it is unclear whether scrolling further is worth it. Separate case: the
+        // record is in the list because of its raw text (spec §7) and the shown text has none of the
+        // query — without a word about it that looks like a bug.
+        if (q.Length == 0) SearchInfo.Text = "";
+        else if (matches > 0) SearchInfo.Text = string.Format(S.HistSearchMatchesFmt, matches);
+        else if (HistorySearch.MatchedOnlyInRaw(record, q)) SearchInfo.Text = S.HistSearchInRaw;
+        else SearchInfo.Text = "";
+    }
+
+    /// <summary>
+    /// Puts the record's text in the detail pane with the query highlighted, and returns how many
+    /// times it was found there. When the record answered only through the engine's raw text, that
+    /// raw text is appended below, muted: otherwise "found in the original" stays a claim the user
+    /// cannot check. Highlighting the corresponding part of the final text instead is impossible —
+    /// after an AI correction there is no correspondence, the model rewrites whole phrases.
+    /// </summary>
+    private int ShowRecord(Transcription record, string query)
+    {
+        var raw = HistorySearch.MatchedOnlyInRaw(record, query) ? record.RawText : null;
+        var (document, matches, first) = Highlight.RecordDocument(record.Text, query, raw, S.HistSearchRawPrefix);
+        Detail.Document = document;
+        // Scrolling to the first hit only makes sense once the document has been laid out.
+        if (first is not null)
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
+                new Action(() => first.BringIntoView()));
+        return matches;
     }
 
     /// <summary>Exports the whole history to Markdown / CSV / JSON (spec §7); audio is not included.</summary>
@@ -162,53 +216,6 @@ public partial class HistoryWindow : Window
         {
             Log.Error("history export failed", ex);
             StatusText.Text = string.Format(S.ExportFailedFmt, ex.Message);
-        }
-    }
-
-    private Transcription? Selected => (Grid.SelectedItem as Row)?.Item;
-
-    /// <summary>All selected records (spec §7: multi-select).</summary>
-    private List<Transcription> SelectedItems =>
-        Grid.SelectedItems.OfType<Row>().Select(r => r.Item).ToList();
-
-    /// <summary>Copy/Play only make sense for a single record; delete works on the whole selection.</summary>
-    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        int count = Grid.SelectedItems.Count;
-        CopyButton.IsEnabled = count == 1;
-        DeleteButton.IsEnabled = count >= 1;
-        RefreshPlayButton();   // stays enabled (as Stop) while something is playing
-        ResetStatus();
-        UpdateSearchInfo();
-    }
-
-    /// <summary>
-    /// The idle status line: the size of a multi-selection, otherwise how much of the history is on
-    /// screen. Called whenever a transient message ("Playing…", "7 selected") stops being true.
-    /// </summary>
-    private void ResetStatus()
-    {
-        int selected = Grid.SelectedItems.Count;
-        if (selected > 1)
-        {
-            StatusText.Text = string.Format(S.HistSelectedFmt, selected);
-            return;
-        }
-        int shown = Grid.Items.Count;
-        // An empty history and an empty result are different states (spec §7) — "nothing found"
-        // must not read as "you have never dictated anything".
-        if (_all.Count == 0) StatusText.Text = S.HistEmpty;
-        else if (Query.Length == 0) StatusText.Text = string.Format(S.HistCountFmt, shown);
-        else if (shown == 0) StatusText.Text = S.HistSearchNone;
-        else StatusText.Text = string.Format(S.HistSearchFoundFmt, shown, _all.Count);
-    }
-
-    private void OnGridKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Delete && Grid.SelectedItems.Count > 0)
-        {
-            OnDelete(sender, e);
-            e.Handled = true;
         }
     }
 
@@ -287,7 +294,8 @@ public partial class HistoryWindow : Window
         _reader?.Dispose();
         _reader = null;
         RefreshPlayButton();
-        if (wasPlaying) ResetStatus();   // clears "Playing…", whether stopped by hand or at the end
+        // Clears "Playing…", whether stopped by hand or at the end of the file.
+        if (wasPlaying && Selected is { } t) StatusText.Text = HistoryFormat.MetaLine(t);
     }
 
     /// <summary>Play ⇄ Stop on the button and the context menu, and keep Stop clickable.</summary>
@@ -295,6 +303,6 @@ public partial class HistoryWindow : Window
     {
         PlayButton.Content = IsPlaying ? S.BtnStop : S.BtnPlay;
         PlayMenuItem.Header = IsPlaying ? S.BtnStop : S.BtnPlay;
-        PlayButton.IsEnabled = IsPlaying || Grid.SelectedItems.Count == 1;
+        PlayButton.IsEnabled = IsPlaying || List.SelectedItems.Count == 1;
     }
 }
