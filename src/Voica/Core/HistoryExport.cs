@@ -100,6 +100,8 @@ public static class HistoryExport
             if (r.Duration is { } d) obj["duration_sec"] = d;
             if (!string.IsNullOrWhiteSpace(r.Model)) obj["model"] = r.Model;
             if (!string.IsNullOrWhiteSpace(r.AudioFilename)) obj["audio_filename"] = r.AudioFilename;
+            // JSON only: the CSV header is a documented contract, and Markdown is for reading.
+            if (!string.IsNullOrWhiteSpace(r.RawText)) obj["raw_text"] = r.RawText;
             list.Add(obj);
         }
 

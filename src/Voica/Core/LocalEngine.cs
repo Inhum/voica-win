@@ -79,9 +79,13 @@ public sealed class LocalEngine : IDisposable
 
     /// <summary>
     /// Joins two adjacent chunk transcripts, removing the text that overlapping audio produced
-    /// twice: finds the largest word-run where the tail of <paramref name="prev"/> matches the head
-    /// of <paramref name="next"/> (ignoring case/punctuation) and drops that duplicated head. If no
-    /// confident overlap is found, falls back to a plain space-join — never worse than a hard cut.
+    /// twice (spec §2.5): finds the largest word-run where the tail of <paramref name="prev"/>
+    /// matches the head of <paramref name="next"/> and drops that duplicated head. Matching is
+    /// deliberately tolerant — see <see cref="SameWord"/>. When nothing matches, the last word of
+    /// the first chunk is dropped and the search repeats: a window often cuts a word in half
+    /// ("из кип" for "из кирпича"), and that stub resembles nothing, breaking the whole run. The
+    /// whole word is present in the next chunk, so the stub is safe to lose. Still nothing —
+    /// plain space-join, never worse than a hard cut.
     /// </summary>
     public static string StitchOverlap(string prev, string next)
     {
@@ -90,17 +94,56 @@ public sealed class LocalEngine : IDisposable
 
         var pw = prev.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var nw = next.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        int max = Math.Min(Math.Min(pw.Length, nw.Length), MaxOverlapWords);
 
+        if (TryJoin(prev, pw, nw, out var joined)) return joined;
+
+        int cut = prev.TrimEnd().LastIndexOf(' ');
+        if (cut > 0 && pw.Length > 1 && TryJoin(prev[..cut], pw[..^1], nw, out var withoutStub))
+            return withoutStub;
+
+        return prev + " " + next;
+    }
+
+    private static bool TryJoin(string prevText, string[] pw, string[] nw, out string result)
+    {
+        int max = Math.Min(Math.Min(pw.Length, nw.Length), MaxOverlapWords);
         for (int k = max; k >= 1; k--)
         {
             bool match = true;
             for (int i = 0; i < k && match; i++)
-                match = Normalize(pw[pw.Length - k + i]) == Normalize(nw[i]);
+                match = SameWord(pw[pw.Length - k + i], nw[i]);
             if (match)
-                return prev + " " + string.Join(' ', nw.Skip(k));
+            {
+                var rest = string.Join(' ', nw.Skip(k));
+                result = rest.Length == 0 ? prevText : prevText + " " + rest;
+                return true;
+            }
         }
-        return prev + " " + next;
+        result = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Whether two words at a chunk seam are the same word (spec §2.5). Exact comparison does not
+    /// work: neighbouring windows hear the overlap with different context and write it differently
+    /// ("руководителя" / "руководитель"), the run then fails to match, and BOTH copies reach the
+    /// text. So words also count as equal when they diverge only in the tail — a common prefix of
+    /// at least 80 % of the longer one. Words shorter than 6 characters are compared exactly, or
+    /// "стол" would merge with "стоп".
+    /// </summary>
+    public static bool SameWord(string a, string b)
+    {
+        var x = Normalize(a);
+        var y = Normalize(b);
+        if (x.Length == 0 || y.Length == 0) return false;
+        if (x == y) return true;
+
+        int longer = Math.Max(x.Length, y.Length);
+        if (longer < 6) return false;
+
+        int common = 0;
+        while (common < x.Length && common < y.Length && x[common] == y[common]) common++;
+        return common * 5 >= longer * 4;
     }
 
     private static string Normalize(string word) =>

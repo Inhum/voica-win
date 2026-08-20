@@ -211,6 +211,27 @@ public static class SelfTest
             LocalEngine.StitchOverlap("это тест.", "Тест, дальше") == "это тест. дальше");
         Check("stitch falls back to space-join",
             LocalEngine.StitchOverlap("привет", "мир") == "привет мир");
+        // Live cases from the spec (§2.5): neighbouring windows spell the overlap differently, and
+        // exact comparison let both copies through.
+        Check("stitch tolerates a different ending at the seam",
+            LocalEngine.StitchOverlap(
+                "нужно было собрать руководителя одного отдела, руководителя другого отдела",
+                "руководитель одного отдела, руководитель другого отдела приходилось согласовывать")
+            == "нужно было собрать руководителя одного отдела, руководителя другого отдела приходилось согласовывать");
+        // A window cuts a word in half; the stub matches nothing, so it is dropped and the whole
+        // word comes from the next chunk.
+        Check("stitch drops a half-heard word and finds the overlap behind it",
+            LocalEngine.StitchOverlap(
+                "может быть, из чего вообще строить, из кип",
+                "может быть, из чего вообще строить, из кирпича или из дерева")
+            == "может быть, из чего вообще строить, из кирпича или из дерева");
+        Check("stitch keeps short lookalikes apart",
+            !LocalEngine.SameWord("стол", "стоп")
+            && LocalEngine.StitchOverlap("поставь стол", "стоп машина") == "поставь стол стоп машина");
+        Check("stitch tolerance needs a long common prefix",
+            LocalEngine.SameWord("руководителя", "руководитель")
+            && !LocalEngine.SameWord("руководителя", "рукоятка")
+            && LocalEngine.SameWord("согласование", "согласования"));
         Check("stitch handles empty",
             LocalEngine.StitchOverlap("", "мир") == "мир" && LocalEngine.StitchOverlap("привет", "") == "привет");
 
@@ -420,14 +441,63 @@ public static class SelfTest
             batchDeleted == stressIds.Count && Store.Shared.Count() == stressBefore);
         Check("store batch delete on empty list is a no-op", Store.Shared.DeleteMany(Array.Empty<long>()) == 0);
 
-        // --- Store: audio lifecycle + retention purge (spec §7, §8) ---
-        var savedStoreAudio = Prefs.StoreAudio;
-        Paths.EnsureCreated();
+        // --- raw_text: engine text before correction (spec §7) ---
+        var rawId = Store.Shared.Insert("исправленный текст", null, null, "test", null,
+            rawText: "сырой текст");
+        var rawRow = rawId is null ? null : Store.Shared.All().FirstOrDefault(t => t.Id == rawId.Value);
+        Check("store keeps raw_text when correction changed the text",
+            rawRow?.RawText == "сырой текст" && rawRow.Text == "исправленный текст");
+        if (rawId is not null) Store.Shared.Delete(rawId.Value);
 
+        var sameId = Store.Shared.Insert("одинаковый текст", null, null, "test", null,
+            rawText: "одинаковый текст");
+        var sameRow = sameId is null ? null : Store.Shared.All().FirstOrDefault(t => t.Id == sameId.Value);
+        Check("store drops raw_text when nothing changed", sameRow is not null && sameRow.RawText is null);
+        if (sameId is not null) Store.Shared.Delete(sameId.Value);
+
+        // The column must appear in databases created before it existed: CREATE TABLE IF NOT
+        // EXISTS leaves an old table alone, so the migration is what carries them (spec §7).
+        var legacyDb = Path.Combine(Path.GetTempPath(), $"voica-legacy-{Guid.NewGuid():N}.sqlite");
+        try
+        {
+            using (var legacy = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={legacyDb}"))
+            {
+                legacy.Open();
+                using var create = legacy.CreateCommand();
+                create.CommandText = """
+                    CREATE TABLE transcriptions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT, created_at INTEGER NOT NULL,
+                        text TEXT NOT NULL, language TEXT, duration_sec REAL,
+                        audio_filename TEXT, model TEXT);
+                    """;
+                create.ExecuteNonQuery();
+            }
+            Check("legacy database gains raw_text and survives a second run",
+                Store.MigrateRawText(legacyDb) && Store.MigrateRawText(legacyDb)
+                && Store.HasRawTextColumn(legacyDb));
+        }
+        finally
+        {
+            try { File.Delete(legacyDb); } catch { }
+        }
+
+        var rawJson = HistoryExport.Render(
+            new[] { new Transcription(7, DateTimeOffset.UnixEpoch, "итог", null, null, null, "m", "сырое") },
+            ExportFormat.Json);
+        Check("json export carries raw_text, csv header does not",
+            rawJson.Contains("raw_text")
+            && !HistoryExport.Render(Array.Empty<Transcription>(), ExportFormat.Csv).Contains("raw_text"));
+        Check("json export omits raw_text when there is none",
+            !HistoryExport.Render(
+                new[] { new Transcription(8, DateTimeOffset.UnixEpoch, "итог", null, null, null, "m") },
+                ExportFormat.Json).Contains("raw_text"));
+
+        // Audio retention (spec §8): a stored recording keeps its file next to the record.
+        var savedStoreAudio = Prefs.StoreAudio;
         Prefs.StoreAudio = true;
         var keepWav = Path.Combine(Paths.AudioDir, $"rec-selftest-{Guid.NewGuid():N}.wav");
         File.WriteAllBytes(keepWav, new byte[2048]);
-        var keepId = Store.Shared.Insert("__voica_audio_selftest__", "ru", 1.0, "test", keepWav);
+        var keepId = Store.Shared.Insert("__voica_audio_selftest__", null, null, "test", keepWav);
         var keepRow = keepId is null ? null : Store.Shared.All().FirstOrDefault(t => t.Id == keepId.Value);
         Check("store keeps audio when enabled",
             keepRow?.AudioPath is not null && File.Exists(keepRow.AudioPath));

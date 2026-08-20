@@ -13,7 +13,8 @@ public sealed record Transcription(
     string? Language,
     double? Duration,
     string? AudioFilename,
-    string? Model)
+    string? Model,
+    string? RawText = null)
 {
     /// <summary>Full path to the audio file, or null if none is stored.</summary>
     public string? AudioPath => AudioFilename is null ? null : Path.Combine(Paths.AudioDir, AudioFilename);
@@ -49,10 +50,57 @@ public sealed class Store
                 language       TEXT,
                 duration_sec   REAL,
                 audio_filename TEXT,
-                model          TEXT
+                model          TEXT,
+                raw_text       TEXT
             );
             """;
         cmd.ExecuteNonQuery();
+
+        AddRawTextColumn(_connection);
+    }
+
+    /// <summary>
+    /// Databases created before raw_text existed keep their old shape — CREATE TABLE IF NOT EXISTS
+    /// leaves them alone (spec §7). Adding the column throws "duplicate column name" on a fresh
+    /// database, which is the normal outcome, not a failure.
+    /// </summary>
+    private static void AddRawTextColumn(SqliteConnection connection)
+    {
+        try
+        {
+            using var migrate = connection.CreateCommand();
+            migrate.CommandText = "ALTER TABLE transcriptions ADD COLUMN raw_text TEXT;";
+            migrate.ExecuteNonQuery();
+            Log.Info("history: added the raw_text column to an existing database");
+        }
+        catch (SqliteException)
+        {
+            // Already there.
+        }
+    }
+
+    /// <summary>Runs the raw_text migration against a database file (self-test entry point).</summary>
+    internal static bool MigrateRawText(string databasePath)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        AddRawTextColumn(connection);
+        return HasRawTextColumn(connection);
+    }
+
+    /// <summary>True when the transcriptions table has the raw_text column.</summary>
+    internal static bool HasRawTextColumn(string databasePath)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        return HasRawTextColumn(connection);
+    }
+
+    private static bool HasRawTextColumn(SqliteConnection connection)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('transcriptions') WHERE name = 'raw_text';";
+        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L) > 0;
     }
 
     /// <summary>
@@ -60,7 +108,12 @@ public sealed class Store
     /// is enabled (spec §8), the file is kept and its name recorded; otherwise it is deleted and
     /// the record stores no audio. Returns the new row id, or null on failure.
     /// </summary>
-    public long? Insert(string text, string? language, double? duration, string? model, string? audioTempPath)
+    /// <param name="rawText">
+    /// Engine text before term correction, stored ONLY when the correction changed something
+    /// (spec §7); when it matches the final text this is null — two identical copies are useless.
+    /// </param>
+    public long? Insert(string text, string? language, double? duration, string? model, string? audioTempPath,
+        string? rawText = null)
     {
         lock (_gate)
         {
@@ -77,8 +130,8 @@ public sealed class Store
             {
                 using var cmd = _connection.CreateCommand();
                 cmd.CommandText = """
-                    INSERT INTO transcriptions (created_at, text, language, duration_sec, audio_filename, model)
-                    VALUES ($created_at, $text, $language, $duration, $audio, $model);
+                    INSERT INTO transcriptions (created_at, text, language, duration_sec, audio_filename, model, raw_text)
+                    VALUES ($created_at, $text, $language, $duration, $audio, $model, $raw);
                     SELECT last_insert_rowid();
                     """;
                 cmd.Parameters.AddWithValue("$created_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
@@ -87,6 +140,9 @@ public sealed class Store
                 cmd.Parameters.AddWithValue("$duration", (object?)duration ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$audio", (object?)audioFilename ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$model", (object?)model ?? DBNull.Value);
+                // Same text on both sides means the correction changed nothing — keep it null.
+                var raw = string.IsNullOrEmpty(rawText) || rawText == text ? null : rawText;
+                cmd.Parameters.AddWithValue("$raw", (object?)raw ?? DBNull.Value);
                 var id = (long)(cmd.ExecuteScalar() ?? 0L);
                 return id;
             }
@@ -105,7 +161,7 @@ public sealed class Store
             var list = new List<Transcription>();
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = """
-                SELECT id, created_at, text, language, duration_sec, audio_filename, model
+                SELECT id, created_at, text, language, duration_sec, audio_filename, model, raw_text
                 FROM transcriptions
                 ORDER BY created_at DESC, id DESC;
                 """;
@@ -252,7 +308,8 @@ public sealed class Store
         Language: reader.IsDBNull(3) ? null : reader.GetString(3),
         Duration: reader.IsDBNull(4) ? null : reader.GetDouble(4),
         AudioFilename: reader.IsDBNull(5) ? null : reader.GetString(5),
-        Model: reader.IsDBNull(6) ? null : reader.GetString(6));
+        Model: reader.IsDBNull(6) ? null : reader.GetString(6),
+        RawText: reader.IsDBNull(7) ? null : reader.GetString(7));
 
     private static void TryDelete(string path)
     {

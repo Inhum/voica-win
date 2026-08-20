@@ -205,8 +205,10 @@ public sealed class DictationController : IDisposable
 
                 // Persist the FINAL (corrected) text to history (spec §6.1). Store honors
                 // "store audio" (spec §8) — it keeps or deletes the temp WAV (already in AudioDir).
+                // The engine's own text rides along; Store drops it when correction changed
+                // nothing, so a filled raw_text always means "these two differ" (spec §7).
                 var id = Store.Shared.Insert(finalText, result.Language, result.Duration,
-                    modelUsed, recording.FilePath);
+                    modelUsed, recording.FilePath, rawText: result.Text);
                 Log.Info($"saved to history id={id?.ToString() ?? "null"}");
             }
             else
