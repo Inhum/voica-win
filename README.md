@@ -47,7 +47,9 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   and the language (auto‑detect, great for mixed Russian/English, or force Russian/English).
 - **Local offline engine** (optional) — recognition fully on your PC via **GigaAM v3** (Russian,
   with punctuation), no network and no API key. If the cloud is selected but the network is down,
-  Voica automatically falls back to the local engine when the model is installed.
+  Voica automatically falls back to the local engine when the model is installed. Trade-off: Latin
+  words can come out as a mix of alphabets (`Dпсик` instead of `DeepSeek`) — that is exactly what
+  the vocabulary fixes, see below. The recognition hint stays cloud-only.
 - **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
   the clipboard as a fallback. Or show an editable **result window**.
 - **History** (SQLite) — browse, **search** (Ctrl+F — it also looks at what the engine heard before
@@ -55,12 +57,19 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   or a whole multi‑selection), and **export** the entire history to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
-- **Vocabulary** — list the terms speech recognition mangles (names, jargon, anglicisms) and Voica
-  pulls garbled spellings back to them **by rule**: no key, no internet, both engines. The cloud
-  engine additionally gets the list as a hint during recognition (~800 characters, with a live
-  budget counter). An optional **AI pass** (Groq LLM) then takes what rules cannot — grammatical
-  case and badly garbled terms. More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md)
-  (in Russian).
+- **Vocabulary** — list the terms recognition mangles (names, jargon, anglicisms). It works in three
+  layers:
+  - **Rules, right on your PC.** Garbled spellings are pulled back to the ones you listed — no key,
+    no internet, both engines — and it switches itself on whenever the vocabulary isn't empty. This
+    is what makes the local engine genuinely self-contained.
+  - **A recognition hint** — cloud only: the list goes to Whisper and biases what it hears. Soft
+    limit ~800 characters (the model only reads the last ~224 tokens; a live counter in Settings
+    shows the budget), so keep the terms that matter at the end of the list.
+  - **An AI pass** (Groq LLM), optional — handles what rules cannot: grammatical case and badly
+    garbled terms. Needs the key and internet; if the request fails you keep the text the rules
+    produced, so it never makes things worse.
+
+  More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md) (in Russian).
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.
 - **Privacy** — no backend, no telemetry. Network is used only for Groq (cloud transcription /
@@ -86,7 +95,8 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 
 ![Dictation bar](docs/hud.png)
 
-**History** — browse, re‑copy, play, delete, export:
+**History** — the list on the left, the record's text on the right; search covers what was said
+before any fixing:
 
 ![History window](docs/history.png)
 
@@ -173,7 +183,8 @@ reflects state instead: idle (blue), recording (pulsing red), transcribing (ambe
 | Show a notification after inserting | The tray balloon; can be turned off |
 | Check for updates on launch | Once a day, opt‑in |
 | Delete audio older than | N days; 0 = keep forever |
-| Vocabulary | Terms/names hint (last 800 chars used) |
+| Vocabulary | Terms fixed by rule on both engines; also a cloud hint (last 800 chars used) |
+| Fix terms with AI | Optional Groq pass on top of the rules; off by default |
 | Groq API key | Validate + Save (DPAPI); **Show** to reveal |
 | Delete all data… | Wipes history, audio, key, settings (random‑phrase confirmation) |
 
