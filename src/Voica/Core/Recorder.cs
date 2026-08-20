@@ -27,6 +27,7 @@ public sealed class Recorder : IDisposable
     private DateTime? _firstSampleUtc;
     private long _lastSampleTicks;
     private volatile bool _stopRequested;
+    private volatile bool _meterWanted;
     private volatile bool _captureLostReported;
     private System.Threading.Timer? _watchdog;
 
@@ -74,6 +75,8 @@ public sealed class Recorder : IDisposable
         _firstSampleUtc = null;
         _stopRequested = false;
         _captureLostReported = false;
+        // Read once per recording, not per buffer: settings are locked behind a mutex.
+        _meterWanted = Prefs.ShowOverlay;
         System.Threading.Volatile.Write(ref _lastSampleTicks, DateTime.UtcNow.Ticks);
 
         System.Threading.Volatile.Write(ref _level, 0);
@@ -176,16 +179,30 @@ public sealed class Recorder : IDisposable
     {
         _firstSampleUtc ??= DateTime.UtcNow;
         System.Threading.Volatile.Write(ref _lastSampleTicks, DateTime.UtcNow.Ticks);
-        // An exception thrown out of here does not just lose one buffer: NAudio stops the capture
-        // and the app records silence for as long as the user keeps talking. Swallow and log.
+        // Writing the buffer to the file is the only thing that HAS to happen here — it is the
+        // dictation. It goes first, and everything else is optional work that must never come
+        // before it. An exception thrown out of this callback does not just lose one buffer:
+        // NAudio stops the capture, and the app records silence for as long as the user keeps
+        // talking. So it is swallowed and logged.
         try
         {
             _writer?.Write(e.Buffer, 0, e.BytesRecorded);
-            UpdateLevel(e.Buffer, e.BytesRecorded);
         }
         catch (Exception ex)
         {
             Log.Error("dropped an audio buffer", ex);
+        }
+
+        // The level meter exists for the recording capsule (spec §4.2) and for nothing else. With
+        // the capsule turned off, the capture path does no arithmetic at all.
+        if (!_meterWanted) return;
+        try
+        {
+            UpdateLevel(e.Buffer, e.BytesRecorded);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("level meter failed", ex);
         }
     }
 
