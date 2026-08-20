@@ -30,21 +30,81 @@ public partial class HistoryWindow : Window
     private WaveOutEvent? _output;
     private AudioFileReader? _reader;
 
+    /// <summary>The whole history as loaded; the grid shows what the search leaves of it (spec §7).</summary>
+    private IReadOnlyList<Transcription> _all = Array.Empty<Transcription>();
+
+    /// <summary>Filtering runs on a typing pause, not on every letter (spec §7).</summary>
+    private readonly System.Windows.Threading.DispatcherTimer _searchDebounce = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(300),
+    };
+
     public HistoryWindow()
     {
         InitializeComponent();
+        _searchDebounce.Tick += (_, _) => { _searchDebounce.Stop(); ApplyFilter(); };
         Loaded += (_, _) => Reload();
-        Closed += (_, _) => StopPlayback();
+        Closed += (_, _) => { _searchDebounce.Stop(); StopPlayback(); };
     }
 
     private void Reload()
     {
-        var rows = new List<Row>();
-        foreach (var t in Store.Shared.All())
-            rows.Add(new Row { Item = t });
+        _all = Store.Shared.All();
+        // Export stays an action over the WHOLE history (spec §7), so the search never disables it.
+        ExportButton.IsEnabled = _all.Count > 0;
+        ApplyFilter();
+    }
+
+    private string Query => SearchBox.Text.Trim();
+
+    /// <summary>Rebuilds the list for the current query, keeping a usable selection.</summary>
+    private void ApplyFilter()
+    {
+        var rows = HistorySearch.Filter(_all, Query).Select(t => new Row { Item = t }).ToList();
         Grid.ItemsSource = rows;
-        StatusText.Text = rows.Count == 0 ? S.HistEmpty : string.Format(S.HistCountFmt, rows.Count);
-        ExportButton.IsEnabled = rows.Count > 0;   // spec §7: disabled on an empty history
+        if (rows.Count > 0 && Grid.SelectedIndex < 0) Grid.SelectedIndex = 0;
+        ResetStatus();
+        UpdateSearchInfo();
+    }
+
+    private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
+    {
+        SearchPlaceholder.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _searchDebounce.Stop();
+        _searchDebounce.Start();
+    }
+
+    /// <summary>
+    /// Ctrl+F puts the caret in the search box — without it the field has to be found with the
+    /// mouse. Escape clears the query, the way a search field is expected to behave.
+    /// </summary>
+    private void OnWindowKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            SearchBox.Focus();
+            SearchBox.SelectAll();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && SearchBox.Text.Length > 0)
+        {
+            SearchBox.Clear();
+            _searchDebounce.Stop();
+            ApplyFilter();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Says when the selected record answers the query only through the engine's raw text (spec §7):
+    /// its shown text then lacks what was typed, which reads as a bug unless it is spelled out.
+    /// </summary>
+    private void UpdateSearchInfo()
+    {
+        var q = Query;
+        SearchInfo.Text = q.Length > 0 && Selected is { } t && HistorySearch.MatchedOnlyInRaw(t, q)
+            ? S.HistSearchInRaw
+            : "";
     }
 
     /// <summary>Exports the whole history to Markdown / CSV / JSON (spec §7); audio is not included.</summary>
@@ -100,11 +160,12 @@ public partial class HistoryWindow : Window
         DeleteButton.IsEnabled = count >= 1;
         RefreshPlayButton();   // stays enabled (as Stop) while something is playing
         ResetStatus();
+        UpdateSearchInfo();
     }
 
     /// <summary>
-    /// The idle status line: the size of a multi-selection, otherwise the record count. Called
-    /// whenever a transient message ("Playing…", "7 selected") stops being true.
+    /// The idle status line: the size of a multi-selection, otherwise how much of the history is on
+    /// screen. Called whenever a transient message ("Playing…", "7 selected") stops being true.
     /// </summary>
     private void ResetStatus()
     {
@@ -114,8 +175,13 @@ public partial class HistoryWindow : Window
             StatusText.Text = string.Format(S.HistSelectedFmt, selected);
             return;
         }
-        int total = Grid.Items.Count;
-        StatusText.Text = total == 0 ? S.HistEmpty : string.Format(S.HistCountFmt, total);
+        int shown = Grid.Items.Count;
+        // An empty history and an empty result are different states (spec §7) — "nothing found"
+        // must not read as "you have never dictated anything".
+        if (_all.Count == 0) StatusText.Text = S.HistEmpty;
+        else if (Query.Length == 0) StatusText.Text = string.Format(S.HistCountFmt, shown);
+        else if (shown == 0) StatusText.Text = S.HistSearchNone;
+        else StatusText.Text = string.Format(S.HistSearchFoundFmt, shown, _all.Count);
     }
 
     private void OnGridKeyDown(object sender, KeyEventArgs e)

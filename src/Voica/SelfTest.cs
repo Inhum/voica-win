@@ -141,6 +141,28 @@ public static class SelfTest
         Check("vocabulary splits on commas and newlines",
             TermFix.ParseTerms(" Groq ,\n DeepSeek \n\n Groq ").SequenceEqual(new[] { "Groq", "DeepSeek" }));
 
+        // --- History search (spec §7) ---
+        var searchRows = new[]
+        {
+            new Transcription(1, DateTimeOffset.UnixEpoch, "Запусти Claude Code в терминале.", null, null, null, null, "Запусти клодкод в терминале."),
+            new Transcription(2, DateTimeOffset.UnixEpoch, "Отправь оферту сегодня.", null, null, null, null, null),
+        };
+        Check("search matches the shown text, case-insensitively",
+            HistorySearch.Filter(searchRows, "claude code").Count == 1
+            && HistorySearch.Filter(searchRows, "ОФЕРТУ").Single().Id == 2);
+        // People remember what they SAID, not what the rules and the model made of it (spec §7).
+        Check("search also matches the engine's raw text",
+            HistorySearch.Filter(searchRows, "клодкод").Single().Id == 1);
+        Check("empty query keeps the whole history, misses return nothing",
+            HistorySearch.Filter(searchRows, "  ").Count == 2
+            && HistorySearch.Filter(searchRows, null).Count == 2
+            && HistorySearch.Filter(searchRows, "тайлскейл").Count == 0);
+        Check("a raw-only match is reported as such",
+            HistorySearch.MatchedOnlyInRaw(searchRows[0], "клодкод")
+            && !HistorySearch.MatchedOnlyInRaw(searchRows[0], "Claude")
+            && !HistorySearch.MatchedOnlyInRaw(searchRows[1], "оферту")
+            && !HistorySearch.MatchedOnlyInRaw(searchRows[0], ""));
+
         // --- LLM post-processing prompt (spec §6.1) ---
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
 

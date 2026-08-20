@@ -227,6 +227,13 @@ public static class S
     public static string ExportFailedFmt => Loc.T("Export failed: {0}", "Ошибка экспорта: {0}");
     public static string HistEmpty => Loc.T("No transcriptions yet.", "Пока нет расшифровок.");
     public static string HistCountFmt => Loc.T("{0} transcription(s).", "Записей: {0}.");
+
+    // Search over the history (spec §7). An empty history and an empty result are different
+    // states and must not share a message.
+    public static string HistSearch => Loc.T("Search text", "Поиск по тексту");
+    public static string HistSearchNone => Loc.T("Nothing found", "Ничего не найдено");
+    public static string HistSearchFoundFmt => Loc.T("Found: {0} of {1}.", "Найдено: {0} из {1}.");
+    public static string HistSearchInRaw => Loc.T("found in the original text", "найдено в исходном тексте");
     public static string HistCopied => Loc.T("Copied to clipboard.", "Скопировано в буфер.");
     public static string HistNoAudio => Loc.T("No audio for this record.", "Для этой записи нет аудио.");
     public static string HistPlaying => Loc.T("Playing…", "Воспроизведение…");

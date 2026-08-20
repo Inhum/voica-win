@@ -50,8 +50,9 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   Voica automatically falls back to the local engine when the model is installed.
 - **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
   the clipboard as a fallback. Or show an editable **result window**.
-- **History** (SQLite) — browse, re‑copy, play the audio, delete (one or a whole multi‑selection),
-  and **export** the entire history to Markdown, CSV or JSON.
+- **History** (SQLite) — browse, **search** (Ctrl+F — it also looks at what the engine heard before
+  the corrections, so you find a dictation by what you said), re‑copy, play the audio, delete (one
+  or a whole multi‑selection), and **export** the entire history to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
 - **Vocabulary** — list the terms speech recognition mangles (names, jargon, anglicisms) and Voica
