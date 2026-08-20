@@ -88,9 +88,9 @@ public static class SelfTest
         string Fix(string s) => TermFix.Apply(s, vocab62);
         bool Untouched(string s) => Fix(s) == s;
 
-        Check("skeleton drops vowels and folds c/q to k",
+        Check("skeleton drops vowels and folds c to k, but not q",
             TermFix.Skeleton("DeepSeek") == "dpsk" && TermFix.Skeleton("Claude Code") == "kldkd"
-            && TermFix.Skeleton("Groq") == "grk" && TermFix.Skeleton("Greek") == "grk");
+            && TermFix.Skeleton("Greek") == "grk" && TermFix.Skeleton("Groq") == "grq");
         Check("skeleton transliterates cyrillic to the same shape",
             TermFix.Skeleton("Dпсик") == "dpsk" && TermFix.Skeleton("Dpсиcк") == "dpsk"
             && TermFix.Skeleton("клодкод") == "kldkd");
@@ -101,8 +101,10 @@ public static class SelfTest
 
         Check("mixed alphabet is fixed on the skeleton alone",
             Fix("Открой Dпсик и посмотри ответ.") == "Открой DeepSeek и посмотри ответ."
-            && Fix("Через Dpсиcк я проверил.") == "Через DeepSeek я проверил."
-            && Fix("Ключ для Гроk уже есть.") == "Ключ для Groq уже есть.");
+            && Fix("Через Dpсиcк я проверил.") == "Через DeepSeek я проверил.");
+        // Mixed alphabet is proof of mangling, so one consonant may drift (0.8 here).
+        Check("mixed alphabet tolerates one consonant off the skeleton",
+            Fix("Спроси у Dпсиcт про это.") == "Спроси у DeepSeek про это.");
         Check("latin candidate needs letter closeness too",
             Fix("Модель Deepsc отвечает быстро.") == "Модель DeepSeek отвечает быстро.");
         Check("cyrillic candidate needs an exact skeleton",
@@ -125,6 +127,9 @@ public static class SelfTest
         Check("traps: short skeletons and plain english are left alone",
             Untouched("The Greek alphabet is old.") && Untouched("Это работает vice versa.")
             && Untouched("Локальный движок гигаам скачивается."));
+        // Why q is not folded into k: Grok is a product of its own, and on a folded skeleton it
+        // would match Groq at a letter closeness of 0.75.
+        Check("traps: Grok stays Grok", Untouched("Спросил у Grok вчера."));
         Check("russian terms are never substituted",
             Untouched("Отправь аферту сегодня.") && Untouched("Контракт с ЕИС города Радужный."));
         Check("the window never eats a neighbour",

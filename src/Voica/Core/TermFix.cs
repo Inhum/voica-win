@@ -31,6 +31,14 @@ public static class TermFix
     /// </summary>
     public const double MinLatinSimilarity = 0.6;
 
+    /// <summary>
+    /// How far a mixed-alphabet word's skeleton may drift from the term's and still count (one
+    /// consonant, in practice). Such a word is proof of mangling by itself, so the skeleton does not
+    /// have to line up exactly — but only for a single word: inside a glued window this leniency is
+    /// off, because gluing is already an assumption of its own.
+    /// </summary>
+    public const double MinMixedSkeletonSimilarity = 0.75;
+
     // Minimum skeleton length, stepped by how strong the evidence of mangling is. Not tuning to a
     // case but a consequence of a short skeleton meaning nothing: `vice` yields `vk` exactly like
     // `Voica`, with a letter closeness of 0.60 — right on the threshold, which turned "vice versa"
@@ -160,8 +168,9 @@ public static class TermFix
     /// qualifies. The skeleton must always match exactly; what is required on top of it depends on
     /// the candidate's alphabet.
     /// </summary>
-    private static string? Match(string candidate, Term[] terms, string? candidateSkeleton = null)
+    private static string? Match(string candidate, Term[] terms, string? glueSkeleton = null)
     {
+        bool glued = glueSkeleton is not null;
         var alphabet = Classify(candidate);
         int min = alphabet switch
         {
@@ -170,30 +179,33 @@ public static class TermFix
             Alphabet.Cyrillic => MinSkeletonCyrillic,
             _ => int.MaxValue,
         };
-        var skeleton = candidateSkeleton ?? Skeleton(candidate);
+        var skeleton = glueSkeleton ?? Skeleton(candidate);
         if (skeleton.Length < min) return null;
 
         var letters = Letters(candidate);
         string? best = null;
-        double bestScore = -1;
+        int bestDistance = int.MaxValue;
 
         foreach (var term in terms)
         {
-            if (!string.Equals(term.Skeleton, skeleton, StringComparison.Ordinal)) continue;
-
             // A mixed alphabet in one word is proof of mangling by itself — normal Russian text has
-            // none of it (§2.5) — so the skeleton is enough; letter by letter such a word is far
-            // from the term anyway. Plain Cyrillic proves nothing, but the term is Latin and Latin
-            // terms do not inflect, so an exact skeleton is the whole bar. Plain Latin is ordinary
-            // in Russian dictation and needs closeness on top.
-            double score = Similarity(letters, term.Letters);
-            if (alphabet == Alphabet.Latin && score < MinLatinSimilarity) continue;
+            // none of it (§2.5) — so the skeleton is enough, and one consonant is even allowed to
+            // differ; letter by letter such a word is far from the term anyway. Inside a glued
+            // window that leniency is off: gluing is already an assumption. Plain Cyrillic proves
+            // nothing, but the term is Latin and Latin terms do not inflect, so an exact skeleton is
+            // the whole bar. Plain Latin is ordinary in Russian dictation and needs closeness too.
+            bool hit = string.Equals(term.Skeleton, skeleton, StringComparison.Ordinal);
+            if (!hit && alphabet == Alphabet.Mixed && !glued
+                && skeleton.Length >= 3 && term.Skeleton.Length >= 3)
+                hit = Similarity(skeleton, term.Skeleton) >= MinMixedSkeletonSimilarity;
+            if (!hit) continue;
 
-            if (score > bestScore || (score == bestScore && best is not null && term.Letters.Length > best.Length))
-            {
-                best = term.Canonical;
-                bestScore = score;
-            }
+            if (alphabet == Alphabet.Latin && Similarity(letters, term.Letters) < MinLatinSimilarity)
+                continue;
+
+            // Several terms on one skeleton — take the one closest in length to what was said.
+            int distance = Math.Abs(term.Canonical.Length - candidate.Length);
+            if (distance < bestDistance) { best = term.Canonical; bestDistance = distance; }
         }
         return best;
     }
@@ -201,9 +213,10 @@ public static class TermFix
     /// <summary>
     /// Consonant skeleton (spec §6.2): the word is transliterated into Latin, vowels are dropped,
     /// <c>c</c> is folded to <c>k</c>, repeats are collapsed. Digits and punctuation take no part.
-    /// <c>q</c> folds to <c>k</c> as well — the spec fixes that by example, since it puts
-    /// <c>Groq</c> and <c>Greek</c> on the same skeleton <c>grk</c> (that pair is then kept apart by
-    /// letter closeness, not by the skeleton).
+    /// Only <c>c</c> is folded, not <c>q</c>: the spec's aside that <c>Groq</c> and <c>Greek</c>
+    /// share the skeleton <c>grk</c> is loose prose (the reference folds <c>c</c> alone, leaving
+    /// <c>grq</c>), and folding <c>q</c> costs a real trap — <c>Grok</c>, a product name of its own,
+    /// would then be rewritten into <c>Groq</c> at a letter closeness of 0.75.
     /// </summary>
     public static string Skeleton(string word)
     {
@@ -218,7 +231,7 @@ public static class TermFix
         var skeleton = new StringBuilder(latin.Length);
         for (int i = 0; i < latin.Length; i++)
         {
-            char c = latin[i] is 'c' or 'q' ? 'k' : latin[i];
+            char c = latin[i] == 'c' ? 'k' : latin[i];
             if (IsVowel(c)) continue;
             if (skeleton.Length > 0 && skeleton[skeleton.Length - 1] == c) continue;   // collapse repeats
             skeleton.Append(c);
@@ -256,14 +269,19 @@ public static class TermFix
         return prev[b.Length];
     }
 
-    /// <summary>Lowercased letters and digits — what <see cref="Similarity"/> compares.</summary>
+    /// <summary>
+    /// The word in one alphabet, lowercased — what <see cref="Similarity"/> compares letter by
+    /// letter. Digits and punctuation drop out, so <c>focus-radio</c> and <c>focusradio</c> compare
+    /// as the same spelling.
+    /// </summary>
     private static string Letters(string s)
     {
         var sb = new StringBuilder(s.Length);
         foreach (char raw in s)
         {
             char c = char.ToLowerInvariant(raw);
-            if (char.IsLetterOrDigit(c)) sb.Append(c);
+            if (IsCyrillic(c)) sb.Append(Translit(c));
+            else if (c >= 'a' && c <= 'z') sb.Append(c);
         }
         return sb.ToString();
     }
@@ -329,7 +347,7 @@ public static class TermFix
         'а' => "a", 'б' => "b", 'в' => "v", 'г' => "g", 'д' => "d", 'е' => "e", 'ё' => "e",
         'ж' => "zh", 'з' => "z", 'и' => "i", 'й' => "i", 'к' => "k", 'л' => "l", 'м' => "m",
         'н' => "n", 'о' => "o", 'п' => "p", 'р' => "r", 'с' => "s", 'т' => "t", 'у' => "u",
-        'ф' => "f", 'х' => "h", 'ц' => "c", 'ч' => "ch", 'ш' => "sh", 'щ' => "sch",
+        'ф' => "f", 'х' => "h", 'ц' => "ts", 'ч' => "ch", 'ш' => "sh", 'щ' => "sch",
         'ъ' => "", 'ы' => "y", 'ь' => "", 'э' => "e", 'ю' => "yu", 'я' => "ya",
         _ => "",
     };
