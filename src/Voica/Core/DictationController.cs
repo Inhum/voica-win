@@ -188,15 +188,27 @@ public sealed class DictationController : IDisposable
             {
                 var finalText = result.Text;
 
+                // Deterministic term fixing (spec §6.2): rules, so no key and no network, and it
+                // runs BEFORE the LLM pass — the model gets an already tidied text and is left with
+                // what needs understanding. On with a non-empty vocabulary, no setting of its own.
+                var ruled = TermFix.Apply(finalText, Prefs.Vocabulary);
+                if (!string.Equals(ruled, finalText, StringComparison.Ordinal))
+                {
+                    Log.Info("term rules: corrected");
+                    finalText = ruled;
+                }
+
                 // AI term correction (spec §6.1): opt-in, applies to BOTH engines (needs key+net);
                 // fail-open. The state stays Transcribing while this runs.
                 if (Prefs.LlmPostProcess && key is not null)
                 {
                     // A 403 (model blocked for the Groq org) is reported once per model per
                     // session — it cannot heal itself, unlike a 404 (spec §6.1).
+                    // Compare against what went in — the rules of §6.2 may already have changed it.
+                    var beforeLlm = finalText;
                     finalText = await GroqClient.PostProcessAsync(finalText, key, Prefs.Vocabulary, RaiseNotice);
-                    if (finalText != result.Text)
-                        Log.Info($"llm post-process: corrected ({result.Text.Length} → {finalText.Length} chars)");
+                    if (finalText != beforeLlm)
+                        Log.Info($"llm post-process: corrected ({beforeLlm.Length} → {finalText.Length} chars)");
                     else
                         Log.Info("llm post-process: no changes (or skipped/fail-open)");
                 }

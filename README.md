@@ -54,8 +54,11 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   and **export** the entire history to Markdown, CSV or JSON.
 - **Audio retention** — keep recordings for N days (default 30; 0 = keep forever), or don't store
   audio at all.
-- **Vocabulary** — a hint list of terms/names Whisper often mangles, plus an optional **AI pass**
-  that fixes the ones still garbled. More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md)
+- **Vocabulary** — list the terms speech recognition mangles (names, jargon, anglicisms) and Voica
+  pulls garbled spellings back to them **by rule**: no key, no internet, both engines. The cloud
+  engine additionally gets the list as a hint during recognition (~800 characters, with a live
+  budget counter). An optional **AI pass** (Groq LLM) then takes what rules cannot — grammatical
+  case and badly garbled terms. More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md)
   (in Russian).
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.

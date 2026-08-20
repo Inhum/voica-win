@@ -121,27 +121,39 @@
                 </StackPanel>
             </TabItem>
 
-            <!-- ============ Vocabulary: terms + AI correction (spec §6/§6.1) ============ -->
+            <!-- ============ Vocabulary: terms + rules + AI correction (spec §6/§6.2/§6.1) ============ -->
             <TabItem Header="{x:Static l:S.TabVocabulary}">
                 <StackPanel Margin="12">
-                    <TextBlock Text="{x:Static l:S.LblVocabulary}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="{x:Static l:S.LblVocabulary}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.VocabHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
                     <TextBox x:Name="VocabularyBox" Height="110" AcceptsReturn="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
                              TextChanged="OnVocabularyTextChanged" LostFocus="OnVocabularyChanged" />
                     <TextBlock x:Name="VocabCounter" HorizontalAlignment="Right" Opacity="0.7" Margin="0,2,0,0" />
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.VocabHint}" />
 
                     <Separator Margin="0,12" />
 
-                    <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" Margin="0,0,0,4"
-                              Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" VerticalAlignment="Center"
+                                  Checked="OnLlmChanged" Unchecked="OnLlmChanged" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.LlmHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
                     <TextBlock x:Name="LlmStatusText" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,0,4" />
                     <!-- Model picker: only meaningful while AI correction is on (spec §6.1). -->
                     <StackPanel x:Name="ChatModelPanel" Orientation="Horizontal" Margin="0,0,0,6" Visibility="Collapsed">
                         <TextBlock Text="{x:Static l:S.LblChatModel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <ComboBox x:Name="ChatModelCombo" Width="300" SelectionChanged="OnChatModelChanged" />
                     </StackPanel>
-                    <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="{x:Static l:S.LlmHint}" />
                 </StackPanel>
             </TabItem>
 

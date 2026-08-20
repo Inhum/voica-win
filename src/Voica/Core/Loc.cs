@@ -148,16 +148,20 @@ public static class S
     public static string LblRetention => Loc.T("Delete audio older than", "Удалять аудио старше");
     public static string RetentionSuffix => Loc.T("days  (0 = keep forever)", "дней  (0 = хранить всегда)");
     public static string LblVocabulary => Loc.T("Vocabulary", "Словарь");
+    // Wording mirrors macOS 0.9.15 (`settings.vocab.hint`): since §6.2 the vocabulary works on its
+    // own — rules first, no key and no network — and the prompt hint is the cloud's extra.
     public static string VocabHint => Loc.T(
-        "Terms/names Whisper often gets wrong. A hint, not a hard replacement (kept to the last 800 characters).",
-        "Слова/названия, которые Whisper часто коверкает. Подсказка, не жёсткая замена (учитываются последние 800 символов).");
+        "Terms speech recognition often mishears — names, jargon, anglicisms. E.g.: Kubernetes, kubectl, Groq, ЕИС, оферта. Voica pulls garbled spellings back to the ones listed here by rule — no key, no internet, both engines. The cloud engine also gets the list as a hint during recognition (not a strict rule); the local engine can't take one.",
+        "Слова, которые распознавание часто коверкает — названия, жаргон, англицизмы. Напр.: Kubernetes, kubectl, Groq, ЕИС, оферта. Искажённые написания Voica подтягивает к словарным по правилам: без ключа, без интернета, на обоих движках. Облачному движку список вдобавок уходит подсказкой прямо при распознавании (не жёсткое правило); локальный подсказку принять не может.");
     public static string VocabCounterFmt => "{0} / {1}";
 
     // AI term correction (spec §6.1)
-    public static string ChkLlm => Loc.T("AI term correction (Groq LLM)", "ИИ-исправление терминов (Groq LLM)");
+    public static string ChkLlm => Loc.T(
+        "Fix terms with AI (extra Groq request)",
+        "Исправлять термины через ИИ (доп. запрос к Groq)");
     public static string LlmHint => Loc.T(
-        "After transcription, mangled vocabulary terms are fixed by a Groq chat model. The vocabulary sets the canonical spelling (including case). Works only when the vocabulary is not empty; if it fails, the original text is delivered.",
-        "После распознавания искажённые термины из словаря исправляет chat-модель Groq. Словарь задаёт каноническое написание (включая регистр). Работает только при непустом словаре; при сбое доставляется исходный текст.");
+        "An extra pass on top of the rules: a Groq language model handles what rules cannot — grammatical case and badly garbled terms. Adds ~1–2 s and needs the API key and internet. If the request fails you keep the text the rules produced, so it never makes things worse. Works with both engines.",
+        "Дополнительный проход поверх правил: языковая модель Groq разбирает то, что правилам не под силу — согласует падеж и узнаёт сильно искажённые термины. Добавляет ~1–2 с, нужны ключ и интернет. Если запрос не удался — остаётся текст после правил, хуже не станет. Работает с обоими движками.");
     public static string LlmChecking => Loc.T("Checking model availability…", "Проверка доступности модели…");
     public static string LlmAvailable => Loc.T("✓ Model is available.", "✓ Модель доступна.");
     public static string LlmAvailableFmt => Loc.T("✓ Model is available: {0}", "✓ Модель доступна: {0}");

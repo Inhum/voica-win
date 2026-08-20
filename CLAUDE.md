@@ -46,6 +46,11 @@ pure logic; the suite grows per phase and must stay green. Tests that mutate rea
 key file, DB) must snapshot and restore it. To run "a single test", temporarily comment out the
 others — there is no per-test filter.
 
+**`--normalize-corpus <file>`** runs the §6.2 term rules over a file of past dictations (one per
+line) with the current vocabulary and prints only the lines they changed. Spec §6.2 makes this
+mandatory whenever a threshold moves: thresholds come from data, and every change over the whole
+history has to be justified before the result is frozen as a self-test fixture.
+
 **Rebuild gotcha:** a running `Voica.exe` locks the output exe. Stop it first:
 `Get-Process Voica -ErrorAction SilentlyContinue | Stop-Process -Force`.
 

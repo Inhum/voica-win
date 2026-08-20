@@ -78,6 +78,64 @@ public static class SelfTest
         Check("prompt keeps tail",
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
+        // --- Deterministic term fixing (spec §6.2) ---
+        // Fixtures frozen from the methodology run of 2026-08-20: the rules were driven over the
+        // whole real history (24 dictations, 0 changes — plain Russian business speech) plus this
+        // hand-written trap set. Both sides are mandatory and the negatives matter more: a miss is
+        // picked up by the LLM right after, a corrupted word is not.
+        const string vocab62 = "Claude Code, Cowork, ChatGPT, Voica, focus-radio, ЕИС, оферта, "
+                             + "Groq, API, GigaAM, Tailscale, app-connector, exit-node, DeepSeek";
+        string Fix(string s) => TermFix.Apply(s, vocab62);
+        bool Untouched(string s) => Fix(s) == s;
+
+        Check("skeleton drops vowels and folds c/q to k",
+            TermFix.Skeleton("DeepSeek") == "dpsk" && TermFix.Skeleton("Claude Code") == "kldkd"
+            && TermFix.Skeleton("Groq") == "grk" && TermFix.Skeleton("Greek") == "grk");
+        Check("skeleton transliterates cyrillic to the same shape",
+            TermFix.Skeleton("Dпсик") == "dpsk" && TermFix.Skeleton("Dpсиcк") == "dpsk"
+            && TermFix.Skeleton("клодкод") == "kldkd");
+        Check("similarity is 1 - levenshtein / max length",
+            Math.Abs(TermFix.Similarity("deepsc", "deepseek") - 0.625) < 0.001
+            && Math.Abs(TermFix.Similarity("greek", "groq") - 0.4) < 0.001
+            && Math.Abs(TermFix.Similarity("vice", "voica") - 0.6) < 0.001);
+
+        Check("mixed alphabet is fixed on the skeleton alone",
+            Fix("Открой Dпсик и посмотри ответ.") == "Открой DeepSeek и посмотри ответ."
+            && Fix("Через Dpсиcк я проверил.") == "Через DeepSeek я проверил."
+            && Fix("Ключ для Гроk уже есть.") == "Ключ для Groq уже есть.");
+        Check("latin candidate needs letter closeness too",
+            Fix("Модель Deepsc отвечает быстро.") == "Модель DeepSeek отвечает быстро.");
+        Check("cyrillic candidate needs an exact skeleton",
+            Fix("Надо чатгпт спросить.") == "Надо ChatGPT спросить."
+            && Fix("Дипсик и Клод отвечают.") == "DeepSeek и Клод отвечают.");
+        Check("window glues one word into a two-word term and back",
+            Fix("Запусти клодкод в терминале.") == "Запусти Claude Code в терминале."
+            && Fix("Он сказал: клод код лучше.") == "Он сказал: Claude Code лучше."
+            && Fix("Поставь Tail scale на ноутбук.") == "Поставь Tailscale на ноутбук."
+            && Fix("Проверь апп-коннектор.") == "Проверь app-connector.");
+        Check("punctuation and spacing around the word survive",
+            Fix("Открой Dпсик, потом — Deepsc!") == "Открой DeepSeek, потом — DeepSeek!");
+
+        // Traps: ordinary Russian speech that sounds like a term. Live ones from the spec plus
+        // `vice versa`, which only the corpus run found.
+        Check("traps: sound-alikes are left alone",
+            Untouched("Вика прислала кода на 200 строк.") && Untouched("Папа звонил утром.")
+            && Untouched("Усы у него длинные.") && Untouched("Депеша пришла вчера.")
+            && Untouched("Колодка тормозная стёрлась."));
+        Check("traps: short skeletons and plain english are left alone",
+            Untouched("The Greek alphabet is old.") && Untouched("Это работает vice versa.")
+            && Untouched("Локальный движок гигаам скачивается."));
+        Check("russian terms are never substituted",
+            Untouched("Отправь аферту сегодня.") && Untouched("Контракт с ЕИС города Радужный."));
+        Check("the window never eats a neighbour",
+            Untouched("Я работаю в Cowork каждый день.") && Untouched("Пиши в Voica сегодня.")
+            && Fix("Дипсик и Клод.") == "DeepSeek и Клод.");
+        Check("no vocabulary, no rules",
+            TermFix.Apply("Открой Dпсик.", "") == "Открой Dпсик."
+            && TermFix.Apply("Открой Dпсик.", null) == "Открой Dпсик.");
+        Check("vocabulary splits on commas and newlines",
+            TermFix.ParseTerms(" Groq ,\n DeepSeek \n\n Groq ").SequenceEqual(new[] { "Groq", "DeepSeek" }));
+
         // --- LLM post-processing prompt (spec §6.1) ---
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
 
