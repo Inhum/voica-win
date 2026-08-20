@@ -25,6 +25,29 @@ public sealed class Recorder : IDisposable
     private TaskCompletionSource<bool>? _stopped;
     private double _level;
     private DateTime? _firstSampleUtc;
+    private long _lastSampleTicks;
+    private volatile bool _stopRequested;
+    private volatile bool _captureLostReported;
+    private System.Threading.Timer? _watchdog;
+
+    /// <summary>
+    /// How long the device may go without handing over a buffer before capture counts as dead.
+    /// Buffers are 50 ms of PCM and arrive whether or not anyone is speaking, so a gap this long
+    /// is a stopped device, never a pause in speech.
+    /// </summary>
+    private const double SilenceGapSeconds = 3.0;
+
+    /// <summary>
+    /// Raised when capture ends on its own while the app still believes it is recording — the
+    /// device errored out or simply stopped handing over buffers. The argument is the reason, if
+    /// the driver gave one.
+    ///
+    /// This is not theoretical: a headset once stopped delivering audio 40 seconds into a
+    /// 5:48 dictation, and because nothing noticed, the user went on speaking into a dead
+    /// microphone for five more minutes. Whatever was captured is still worth transcribing —
+    /// but the user has to be told at once, not when they finally press the hotkey.
+    /// </summary>
+    public event Action<string?>? CaptureLost;
 
     public bool IsRecording => _waveIn is not null;
 
@@ -49,9 +72,15 @@ public sealed class Recorder : IDisposable
         _stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _startUtc = DateTime.UtcNow;
         _firstSampleUtc = null;
+        _stopRequested = false;
+        _captureLostReported = false;
+        System.Threading.Volatile.Write(ref _lastSampleTicks, DateTime.UtcNow.Ticks);
+
         System.Threading.Volatile.Write(ref _level, 0);
 
         _waveIn.StartRecording();
+        _watchdog = new System.Threading.Timer(_ => CheckForSilentDevice(), null,
+            TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // Name the device: when capture misbehaves, the first question is always which mic ran.
         try
         {
@@ -71,6 +100,8 @@ public sealed class Recorder : IDisposable
 
         var waveIn = _waveIn;
         var stopRequestedUtc = DateTime.UtcNow;
+        _stopRequested = true;
+        StopWatchdog();
         waveIn.StopRecording();
         await (_stopped?.Task ?? Task.CompletedTask);
 
@@ -123,6 +154,8 @@ public sealed class Recorder : IDisposable
     {
         if (_waveIn is null) return;
         var path = _filePath;
+        _stopRequested = true;
+        StopWatchdog();
         try
         {
             _waveIn.DataAvailable -= OnDataAvailable;
@@ -142,8 +175,46 @@ public sealed class Recorder : IDisposable
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         _firstSampleUtc ??= DateTime.UtcNow;
-        _writer?.Write(e.Buffer, 0, e.BytesRecorded);
-        UpdateLevel(e.Buffer, e.BytesRecorded);
+        System.Threading.Volatile.Write(ref _lastSampleTicks, DateTime.UtcNow.Ticks);
+        // An exception thrown out of here does not just lose one buffer: NAudio stops the capture
+        // and the app records silence for as long as the user keeps talking. Swallow and log.
+        try
+        {
+            _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+            UpdateLevel(e.Buffer, e.BytesRecorded);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("dropped an audio buffer", ex);
+        }
+    }
+
+    /// <summary>
+    /// Notices a device that stopped handing over buffers without ever saying so — no error, no
+    /// RecordingStopped, just silence. Only the gap between buffers gives it away.
+    /// </summary>
+    private void CheckForSilentDevice()
+    {
+        if (_waveIn is null || _stopRequested) return;
+        var since = DateTime.UtcNow - new DateTime(System.Threading.Volatile.Read(ref _lastSampleTicks), DateTimeKind.Utc);
+        if (since.TotalSeconds < SilenceGapSeconds) return;
+        ReportCaptureLost($"the device handed over nothing for {since.TotalSeconds:0.0}s");
+    }
+
+    /// <summary>Reports the loss once per recording — the watchdog and the driver may both see it.</summary>
+    private void ReportCaptureLost(string reason)
+    {
+        if (_captureLostReported || _stopRequested) return;
+        _captureLostReported = true;
+        StopWatchdog();
+        Log.Error($"capture lost: {reason}");
+        CaptureLost?.Invoke(reason);
+    }
+
+    private void StopWatchdog()
+    {
+        _watchdog?.Dispose();
+        _watchdog = null;
     }
 
     /// <summary>
@@ -163,8 +234,16 @@ public sealed class Recorder : IDisposable
         System.Threading.Volatile.Write(ref _level, Math.Max(raw, previous * 0.65));
     }
 
-    private void OnRecordingStopped(object? sender, StoppedEventArgs e) =>
+    private void OnRecordingStopped(object? sender, StoppedEventArgs e)
+    {
         _stopped?.TrySetResult(true);
+        if (_stopRequested) return;
+
+        // Capture ended without anyone asking. NAudio carries the driver's reason here, and it used
+        // to be dropped on the floor — the one piece of evidence for why a dictation went silent.
+        if (e.Exception is { } ex) Log.Error("capture stopped by the device", ex);
+        ReportCaptureLost(e.Exception?.Message ?? "the device stopped capture without an error");
+    }
 
     private static void TryDelete(string path)
     {

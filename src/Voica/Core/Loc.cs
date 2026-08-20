@@ -48,6 +48,9 @@ public static class S
     // Notices / errors (runtime)
     public static string NoticeInserted => Loc.T("Inserted (also copied to clipboard).", "Вставлено (также скопировано в буфер).");
     public static string NoticeNoSpeech => Loc.T("No speech recognized.", "Речь не распознана.");
+    public static string NoticeCaptureLost => Loc.T(
+        "The microphone stopped sending audio — transcribing what was recorded.",
+        "Микрофон перестал отдавать звук — распознаю то, что успело записаться.");
     public static string ErrNoKey => Loc.T("No Groq API key set. Add it in Settings.", "Ключ Groq не задан. Укажите его в Настройках.");
     public static string ErrRecordingStartFmt => Loc.T("Couldn't start recording: {0}", "Не удалось начать запись: {0}");
     public static string ErrRecordingFailedFmt => Loc.T("Recording failed: {0}", "Ошибка записи: {0}");

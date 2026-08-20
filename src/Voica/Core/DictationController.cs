@@ -36,6 +36,7 @@ public sealed class DictationController : IDisposable
         _hotkey.Toggled += OnToggle;
         // First-time model load takes seconds (spec §2.5) — tell the user it's not a hang.
         _localEngine.PreparingModel += () => RaiseNotice(S.LocalPreparing);
+        _recorder.CaptureLost += OnCaptureLost;
     }
 
     public DictationState State => _state;
@@ -92,6 +93,23 @@ public sealed class DictationController : IDisposable
         _recorder.Cancel();          // stops capture and deletes the temp WAV
         SetState(DictationState.Idle);
         Log.Info("recording cancelled by the user");
+    }
+
+    /// <summary>
+    /// The microphone stopped handing over audio mid-recording (spec §3). Everything captured so
+    /// far is still transcribed — it is the user's speech — but the dictation ends right now and
+    /// says so. Speaking for another five minutes into a dead microphone is the failure this
+    /// exists to prevent; the reason is in the log.
+    /// </summary>
+    private void OnCaptureLost(string? reason)
+    {
+        // The driver's callback thread is not ours.
+        _dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_state != DictationState.Recording) return;
+            RaiseNotice(S.NoticeCaptureLost);
+            _ = EndRecordingAndTranscribeAsync();
+        }));
     }
 
     private void BeginRecording()
