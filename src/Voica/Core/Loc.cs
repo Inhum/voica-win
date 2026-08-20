@@ -234,6 +234,7 @@ public static class S
     public static string HistSearchNone => Loc.T("Nothing found", "Ничего не найдено");
     public static string HistSearchFoundFmt => Loc.T("Found: {0} of {1}.", "Найдено: {0} из {1}.");
     public static string HistSearchInRaw => Loc.T("found in the original text", "найдено в исходном тексте");
+    public static string HistSearchRawPrefix => Loc.T("Original, before fixing:", "Исходно, до исправления:");
     public static string HistCopied => Loc.T("Copied to clipboard.", "Скопировано в буфер.");
     public static string HistNoAudio => Loc.T("No audio for this record.", "Для этой записи нет аудио.");
     public static string HistPlaying => Loc.T("Playing…", "Воспроизведение…");

@@ -19,8 +19,26 @@ public partial class HistoryWindow : Window
     public sealed class Row
     {
         public required Transcription Item { get; init; }
+
+        /// <summary>The active search query — the cell highlights its occurrences (spec §7).</summary>
+        public string Query { get; init; } = "";
+
         public string When => Item.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm");
-        public string Preview => Item.Text.Replace("\r", " ").Replace("\n", " ");
+        public string Preview => OneLine(Item.Text);
+
+        /// <summary>
+        /// The engine's own words, shown under the text when the row answered the query only through
+        /// them: otherwise the row displays a text without the searched word and reads as a bug.
+        /// Highlighting the corresponding part of the final text instead is not possible — after an
+        /// AI correction there is no correspondence, the model rewrites whole phrases.
+        /// </summary>
+        public string RawPreview => OneLine(Item.RawText ?? "");
+
+        public Visibility RawVisibility => HistorySearch.MatchedOnlyInRaw(Item, Query)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        private static string OneLine(string s) => s.Replace("\r", " ").Replace("\n", " ");
         public string Lang => Item.Language ?? "";
         public string Duration => Item.Duration is { } d ? $"{d:0.0}s" : "";
         public string ModelName => Item.Model ?? "";
@@ -60,7 +78,8 @@ public partial class HistoryWindow : Window
     /// <summary>Rebuilds the list for the current query, keeping a usable selection.</summary>
     private void ApplyFilter()
     {
-        var rows = HistorySearch.Filter(_all, Query).Select(t => new Row { Item = t }).ToList();
+        var q = Query;
+        var rows = HistorySearch.Filter(_all, q).Select(t => new Row { Item = t, Query = q }).ToList();
         Grid.ItemsSource = rows;
         if (rows.Count > 0 && Grid.SelectedIndex < 0) Grid.SelectedIndex = 0;
         ResetStatus();

@@ -157,6 +157,15 @@ public static class SelfTest
             HistorySearch.Filter(searchRows, "  ").Count == 2
             && HistorySearch.Filter(searchRows, null).Count == 2
             && HistorySearch.Filter(searchRows, "тайлскейл").Count == 0);
+        // Finding the record is half the job on a long dictation — the place inside it has to show.
+        var ranges = HistorySearch.MatchRanges("Claude Code и ещё раз claude code", "Claude");
+        Check("match ranges cover every occurrence, case-insensitively",
+            ranges.Count == 2 && ranges[0] == (0, 6) && ranges[1] == (22, 6));
+        Check("match ranges are empty without a query",
+            HistorySearch.MatchRanges("текст", "  ").Count == 0
+            && HistorySearch.MatchRanges(null, "текст").Count == 0
+            && HistorySearch.MatchRanges("текст", "нет").Count == 0);
+
         Check("a raw-only match is reported as such",
             HistorySearch.MatchedOnlyInRaw(searchRows[0], "клодкод")
             && !HistorySearch.MatchedOnlyInRaw(searchRows[0], "Claude")
