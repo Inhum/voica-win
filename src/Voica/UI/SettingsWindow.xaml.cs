@@ -178,6 +178,11 @@ public partial class SettingsWindow : Window
         int index = HotkeyBinding.Presets.ToList().FindIndex(p => p == current);
         KeyCombo.SelectedIndex = index;   // -1 for a custom combo
         CurrentHotkeyText.Text = string.Format(S.HotkeyCurrentFmt, current.DisplayName());
+        // A bare Left Alt takes the system's Alt+Shift layout switch with it (spec §4) — the key
+        // stays on offer, but not silently.
+        HotkeyLayoutWarning.Visibility = LayoutSwitch.ShouldWarn(current)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _loaded = wasLoaded;
     }
 

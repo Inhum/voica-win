@@ -78,6 +78,23 @@ public static class SelfTest
         Check("prompt keeps tail",
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
+        // --- Layout-switch conflict (spec §4, Windows only) ---
+        // The registry stores the combination as a string: "1" is Alt+Shift, "2" Ctrl+Shift. No
+        // value means the Windows default, which IS Alt+Shift — the machine that reproduced the
+        // conflict has the Toggle key present and empty.
+        Check("alt+shift is recognised, absence included",
+            LayoutSwitch.MeansAltShift("1") && LayoutSwitch.MeansAltShift(" 1 ")
+            && LayoutSwitch.MeansAltShift(null) && LayoutSwitch.MeansAltShift("")
+            && !LayoutSwitch.MeansAltShift("2") && !LayoutSwitch.MeansAltShift("3"));
+        // Only a BARE left Alt collides: the hook swallows it whole. The right Alt never switches
+        // layouts, and a combination leaves its modifiers working.
+        Check("only a bare left alt collides with the layout switch",
+            LayoutSwitch.CollidesWithLayoutSwitch(new HotkeyBinding { MainVk = HotkeyBinding.VK_LMENU })
+            && !LayoutSwitch.CollidesWithLayoutSwitch(new HotkeyBinding { MainVk = HotkeyBinding.VK_RMENU })
+            && !LayoutSwitch.CollidesWithLayoutSwitch(HotkeyBinding.Default)
+            && !LayoutSwitch.CollidesWithLayoutSwitch(
+                new HotkeyBinding { Ctrl = true, Shift = true, MainVk = HotkeyBinding.VK_SPACE }));
+
         // --- Deterministic term fixing (spec §6.2) ---
         // Fixtures frozen from the methodology run of 2026-08-20: the rules were driven over the
         // whole real history (24 dictations, 0 changes — plain Russian business speech) plus this

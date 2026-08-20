@@ -92,6 +92,11 @@
                         </TextBlock>
                     </StackPanel>
 
+                    <!-- Only when a bare Left Alt meets the system's Alt+Shift layout switch (spec §4). -->
+                    <TextBlock x:Name="HotkeyLayoutWarning" Visibility="Collapsed" Margin="0,6,0,0"
+                               TextWrapping="Wrap" Foreground="#B35C00"
+                               Text="{x:Static l:S.HotkeyLayoutWarning}" />
+
                     <TextBlock Text="{x:Static l:S.LblOutput}" FontWeight="SemiBold" Margin="0,14,0,4" />
                     <ComboBox x:Name="OutputCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnOutputChanged" />
 

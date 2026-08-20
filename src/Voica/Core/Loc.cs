@@ -118,6 +118,11 @@ public static class S
     public static string LblHotkey => Loc.T("Hotkey", "Хоткей");
     public static string BtnCustom => Loc.T("Custom…", "Свой…");
     public static string HotkeyCurrentFmt => Loc.T("Current: {0}", "Текущий: {0}");
+
+    // Shown only when a bare Left Alt meets a system layout switch on Alt+Shift (spec §4).
+    public static string HotkeyLayoutWarning => Loc.T(
+        "⚠ The system switches the keyboard layout with Alt+Shift, and a bare hotkey is taken over entirely — the layout will stop switching. Take the right Alt or a combination.",
+        "⚠ В системе раскладка переключается по Alt+Shift, а одиночная клавиша забирается целиком — раскладка переключаться перестанет. Возьмите правый Alt или сочетание.");
     public static string HotkeyHint => Loc.T(
         "A single key is reserved for dictation while Voica runs. A combination (e.g. Ctrl+Shift+Space) only triggers when pressed together, so it won't break other shortcuts.",
         "Одиночная клавиша занимается под диктовку, пока Voica запущена. Комбинация (напр. Ctrl+Shift+Space) срабатывает только целиком и не ломает другие сочетания.");
