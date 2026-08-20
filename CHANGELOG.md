@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-20
+
+### Added
+- **The vocabulary now works on its own, without AI** (spec §6.2). Deterministic rules pull garbled
+  spellings back to the terms you listed — no API key, no internet, and the same on both engines.
+  They run before the optional AI pass, which is left with what actually needs understanding. The
+  match is a consonant skeleton (`Dпсик`, `Dpсиcк`, `Deepsc` all reduce to `DeepSeek`'s `dpsk`), and
+  what is required on top depends on the evidence: a word written in two alphabets at once is proof
+  of mangling by itself, plain Latin also needs letter closeness, plain Cyrillic only ever matches an
+  exact skeleton. Compound terms are found across two words, so `клодкод` and `Tail scale` both land.
+  Nothing matches, nothing is touched: the thresholds were set by running the rules over a whole real
+  history, and every trap — «Вика», «Папа», «усы», `Greek`, `vice versa` — is frozen as a test.
+- **Search in History** (spec §7), with `Ctrl+F` and highlighting. It searches the shown text **and
+  what the engine heard before the corrections**, because people remember what they said, not what
+  the rules and the model made of it. When a record answers only through that original text, it is
+  shown under the record, so you can see what matched.
+- **The engine's raw text is kept** with a record whenever correction changed something (spec §7).
+  It is what the search above looks into, and it rides along in the JSON export.
+- **A warning when a bare Left Alt collides with the system layout switch** (spec §4). Windows
+  switches layouts on Left Alt+Shift, and a bare hotkey is taken over entirely, so the layout would
+  stop switching. The key stays on offer — Settings just says so under it.
+
+### Changed
+- **The History window has two panes**, like the macOS one: the list on the left, the record's text
+  on the right, wrapped and scrollable. A dictation longer than a sentence could not be read at all
+  before. Language, length and engine moved to the line under the text; Export stays an action over
+  the whole history and is not touched by the search.
+- **Settings say what the vocabulary now does**, and the AI toggle is «Fix terms with AI (extra Groq
+  request)» — an optional pass on top of the rules rather than the only way to fix terms. The long
+  explanations moved into the info dots the other tabs already use.
+
+### Fixed
+- **A loud word could kill the recording, silently.** The level meter behind the recording capsule
+  computed its peak with `Math.Abs` on a 16-bit sample, which overflows on exactly the value a
+  microphone produces when the input clips. The exception left the capture callback and took the
+  capture thread with it — so the app went on "recording" nothing while the user kept talking. One
+  live dictation of 5 minutes 48 seconds came back as 40 seconds of text. Fixed, and the capture path
+  now carries nothing but the write to the file.
+- **A dead microphone is now noticed within three seconds** (spec §3), whatever the cause: the
+  driver's reason is logged instead of dropped, an error in the callback costs one 50 ms buffer
+  instead of the recording, and a watchdog watches the gap between buffers. The dictation ends at
+  once, says the microphone stopped sending audio, and transcribes what was captured.
+- **A phrase could appear twice** in a long local-engine dictation (spec §2.5). Neighbouring windows
+  heard one word differently — «управляющий» against «управляющего» — and a single word was enough to
+  break the overlap, so both copies reached the text. A run of four words or more now matches with
+  one word off, except right at the seam, where a mismatch means a word cut in half and the existing
+  fallback recovers it.
+
 ## [0.6.3] - 2026-08-19
 
 ### Added
