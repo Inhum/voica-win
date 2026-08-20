@@ -363,6 +363,18 @@ public static class SelfTest
             LocalEngine.SameWord("руководителя", "руководитель")
             && !LocalEngine.SameWord("руководителя", "рукоятка")
             && LocalEngine.SameWord("согласование", "согласования"));
+        // Live case (a 40 s dictation): the windows disagreed on one word only — "управляющий" vs
+        // "управляющего", 9 letters of 12 in common, just under the 80 % bar — and that single word
+        // put the whole phrase into the text twice.
+        Check("stitch forgives one divergent word in a long run",
+            LocalEngine.StitchOverlap(
+                "по второму сотруднику управляющий филиала сказал: «Подожди",
+                "Сотруднику управляющего филиала сказал: «Подожди, пока ничего не отвечай»")
+            == "по второму сотруднику управляющий филиала сказал: «Подожди пока ничего не отвечай»");
+        // The forgiveness needs a run to hide in: three words with one wrong is not a match.
+        Check("stitch does not forgive inside a short run",
+            LocalEngine.StitchOverlap("поставил стол у стены", "стул у стены и ушёл")
+            == "поставил стол у стены стул у стены и ушёл");
         Check("stitch handles empty",
             LocalEngine.StitchOverlap("", "мир") == "мир" && LocalEngine.StitchOverlap("привет", "") == "привет");
 

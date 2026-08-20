@@ -104,14 +104,30 @@ public sealed class LocalEngine : IDisposable
         return prev + " " + next;
     }
 
+    /// <summary>
+    /// Words in a run this long may include one the two windows heard differently. A single word is
+    /// enough to break a run: "управляющий филиала сказал" against "управляющего филиала сказал"
+    /// shares only 9 of 12 letters on the first word — under the 80 % bar of <see cref="SameWord"/>
+    /// — and both copies of the whole phrase reached the text (a live 40 s dictation). Four words
+    /// with one off is still three that agree, over two seconds of overlapping audio; below that
+    /// the run is too short to risk it. The word at the seam itself is never the forgiven one.
+    /// </summary>
+    private const int ForgivingRunWords = 4;
+
     private static bool TryJoin(string prevText, string[] pw, string[] nw, out string result)
     {
         int max = Math.Min(Math.Min(pw.Length, nw.Length), MaxOverlapWords);
         for (int k = max; k >= 1; k--)
         {
-            bool match = true;
-            for (int i = 0; i < k && match; i++)
-                match = SameWord(pw[pw.Length - k + i], nw[i]);
+            int misses = 0, missAt = -1;
+            for (int i = 0; i < k && misses <= 1; i++)
+                if (!SameWord(pw[pw.Length - k + i], nw[i])) { misses++; missAt = i; }
+            // The forgiven word may not be the last one of the run: right at the seam a mismatch
+            // usually means the window cut a word in half ("из кип" for "из кирпича"), and dropping
+            // that stub below recovers the whole word — forgiving it here would keep the stub and
+            // lose the word instead.
+            bool match = misses == 0
+                || (misses == 1 && k >= ForgivingRunWords && missAt < k - 1);
             if (match)
             {
                 var rest = string.Join(' ', nw.Skip(k));
