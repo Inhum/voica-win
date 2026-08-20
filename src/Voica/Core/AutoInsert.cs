@@ -50,16 +50,38 @@ public static class AutoInsert
     {
         WaitForModifiersReleased();
 
-        var inputs = new[]
-        {
-            KeyDown(VK_CONTROL),
-            KeyDown(VK_V),
-            KeyUp(VK_V),
-            KeyUp(VK_CONTROL),
-        };
-        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
-        if (sent != inputs.Length)
-            Log.Error($"SendInput injected {sent}/{inputs.Length} events (win32 error {Marshal.GetLastWin32Error()})");
+        // Ctrl goes down FIRST, then any modifier the system still reports as held is released
+        // inside the chord. Order matters and was measured: releasing Alt on its own reads as a
+        // bare Alt tap, which activates the window menu and swallows the paste — the fix then
+        // fails exactly like the bug it was meant to cure.
+        var stuck = StuckModifiers();
+        var inputs = new System.Collections.Generic.List<INPUT> { KeyDown(VK_CONTROL) };
+        foreach (var vk in stuck) inputs.Add(KeyUp(vk));
+        inputs.Add(KeyDown(VK_V));
+        inputs.Add(KeyUp(VK_V));
+        inputs.Add(KeyUp(VK_CONTROL));
+        if (stuck.Count > 0)
+            Log.Info($"insert: releasing modifiers still reported down ({string.Join(", ", stuck.ConvertAll(v => $"0x{v:X2}"))})");
+
+        var batch = inputs.ToArray();
+        uint sent = SendInput((uint)batch.Length, batch, Marshal.SizeOf<INPUT>());
+        if (sent != batch.Length)
+            Log.Error($"SendInput injected {sent}/{batch.Length} events (win32 error {Marshal.GetLastWin32Error()})");
+    }
+
+    /// <summary>
+    /// Modifiers the system still reports as held (spec §5). A bare-key hotkey is swallowed whole,
+    /// so the focused app can be left believing Alt is down, and the paste then arrives as
+    /// Alt+Ctrl+V — not "paste": a terminal renders a bare "v" (or "м" on a Russian layout) instead
+    /// of the dictation. Ctrl itself is never in this list: the chord needs it held.
+    /// </summary>
+    private static System.Collections.Generic.List<ushort> StuckModifiers()
+    {
+        ushort[] candidates = { VK_LMENU, VK_RMENU, VK_LSHIFT, VK_RSHIFT, VK_LWIN_K, VK_RWIN_K };
+        var held = new System.Collections.Generic.List<ushort>();
+        foreach (var vk in candidates)
+            if (IsDown(vk)) held.Add(vk);
+        return held;
     }
 
     /// <summary>Polls until Ctrl/Alt/Shift/Win are all physically up, or ~1 s passes.</summary>
@@ -110,6 +132,15 @@ public static class AutoInsert
     private const int VK_MENU = 0x12;   // Alt
     private const int VK_LWIN = 0x5B;
     private const int VK_RWIN = 0x5C;
+    // Side-specific codes: an injected up must name the exact key, not the merged VK_MENU/VK_SHIFT.
+    private const ushort VK_LMENU = 0xA4;
+    private const ushort VK_RMENU = 0xA5;
+    private const ushort VK_LCONTROL = 0xA2;
+    private const ushort VK_RCONTROL = 0xA3;
+    private const ushort VK_LSHIFT = 0xA0;
+    private const ushort VK_RSHIFT = 0xA1;
+    private const ushort VK_LWIN_K = 0x5B;
+    private const ushort VK_RWIN_K = 0x5C;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
