@@ -78,6 +78,18 @@ public static class SelfTest
         Check("prompt keeps tail",
             prepared is not null && longVocab.Trim().EndsWith(prepared, StringComparison.Ordinal));
 
+        // --- Microphone level meter (spec §3/§4.2) ---
+        // A clipped sample is -32768, and Math.Abs on a short throws for exactly that value. The
+        // exception used to travel out of the capture callback and kill the recording silently:
+        // 5:48 of speech came back as 40 seconds. The peak must survive full-scale input.
+        Check("peak survives a full-scale negative sample",
+            Recorder.PeakAmplitude(new byte[] { 0x00, 0x80 }, 2) == 32768
+            && Recorder.PeakAmplitude(new byte[] { 0xFF, 0x7F }, 2) == 32767);
+        Check("peak takes the loudest sample and ignores a trailing odd byte",
+            Recorder.PeakAmplitude(new byte[] { 0x10, 0x00, 0x00, 0x80, 0x20, 0x00 }, 6) == 32768
+            && Recorder.PeakAmplitude(new byte[] { 0x00, 0x01, 0x7F }, 3) == 256
+            && Recorder.PeakAmplitude(Array.Empty<byte>(), 0) == 0);
+
         // --- Layout-switch conflict (spec §4, Windows only) ---
         // The registry stores the combination as a string: "1" is Alt+Shift, "2" Ctrl+Shift. No
         // value means the Windows default, which IS Alt+Shift — the machine that reproduced the

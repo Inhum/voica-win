@@ -218,18 +218,33 @@ public sealed class Recorder : IDisposable
     }
 
     /// <summary>
+    /// Loudest sample in a 16-bit little-endian buffer, 0..32768.
+    ///
+    /// The sample is widened to <c>int</c> BEFORE the sign is dropped, and that is the whole point:
+    /// <c>Math.Abs(short.MinValue)</c> throws, because +32768 does not fit in a short. A microphone
+    /// produces exactly that sample the moment the input clips — so the peak meter used to throw on
+    /// the first loud word, the exception took NAudio's capture thread with it, and the recording
+    /// went silent while the user kept talking. That is the 5:48 dictation that yielded 40 seconds.
+    /// </summary>
+    internal static int PeakAmplitude(byte[] buffer, int bytes)
+    {
+        int peak = 0;
+        for (int i = 0; i + 1 < bytes && i + 1 < buffer.Length; i += 2)
+        {
+            int sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+            int magnitude = sample < 0 ? -sample : sample;
+            if (magnitude > peak) peak = magnitude;
+        }
+        return peak;
+    }
+
+    /// <summary>
     /// Tracks the buffer's peak amplitude for the overlay wave: fast attack, slow decay, so the
     /// bars follow speech instead of flickering with every 50 ms buffer.
     /// </summary>
     private void UpdateLevel(byte[] buffer, int bytes)
     {
-        int peak = 0;
-        for (int i = 0; i + 1 < bytes; i += 2)
-        {
-            int sample = Math.Abs((short)(buffer[i] | (buffer[i + 1] << 8)));
-            if (sample > peak) peak = sample;
-        }
-        double raw = peak / 32768.0;
+        double raw = PeakAmplitude(buffer, bytes) / 32768.0;
         double previous = System.Threading.Volatile.Read(ref _level);
         System.Threading.Volatile.Write(ref _level, Math.Max(raw, previous * 0.65));
     }
