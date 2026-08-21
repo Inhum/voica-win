@@ -25,11 +25,20 @@ public static class TermFix
 {
     /// <summary>
     /// Letter-level closeness a pure-Latin candidate must reach on top of the skeleton match
-    /// (Levenshtein, as a ratio). Without it "Greek" would become "Groq" — they share the skeleton
-    /// <c>grk</c>. Measured: <c>Deepsc</c>/<c>DeepSeek</c> = 0.63 → fix, <c>Greek</c>/<c>Groq</c> =
-    /// 0.40 → leave alone.
+    /// (Levenshtein, as a ratio). Plain Latin proves nothing by itself — Russian dictation is full
+    /// of ordinary English words — so a matching skeleton alone is not enough evidence.
+    ///
+    /// Measured, not guessed: <c>Deepsc</c>/<c>DeepSeek</c> = 0.62 and <c>Depsic</c>/<c>DeepSeek</c>
+    /// = 0.50, both real manglings from live dictations. The bar was 0.6 until macOS 0.9.18 lowered
+    /// it on data — a run over that history (138 lines) produced the same twenty replacements at
+    /// either value, and here the only line 0.5 adds is the <c>Depsic</c> one.
+    ///
+    /// ⚠️ What keeps "Greek" from becoming "Groq" is the SKELETON, not this threshold: <c>c</c>
+    /// folds to <c>k</c> and <c>q</c> does not, so the two are <c>grk</c> against <c>grq</c> and
+    /// never meet. The spec used to name the threshold as the reason; that was wrong, and the trap
+    /// does not depend on this number (their letter closeness is 0.40 in any case).
     /// </summary>
-    public const double MinLatinSimilarity = 0.6;
+    public const double MinLatinSimilarity = 0.5;
 
     /// <summary>
     /// How far a mixed-alphabet word's skeleton may drift from the term's and still count (one

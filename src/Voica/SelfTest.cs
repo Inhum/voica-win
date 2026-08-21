@@ -118,11 +118,11 @@ public static class SelfTest
             Fillers.Strip("Ну, эээ, дальше") == "Ну, дальше"
             && Fillers.Strip("проверка хмм всяких штук") == "проверка всяких штук"
             && Fillers.Strip("Хм, понял") == "Понял");
-        // Three-letter interjections stay: the collapsed form has to be one or two letters, and
-        // «угу»/«ага» are three. The spec's prose calls them two-letter and lists them among the
-        // removable ones, but the reference gates on length exactly this way, so they never fire
-        // there either — mirrored deliberately, and reported back rather than "fixed" here.
-        Check("three-letter interjections are left alone",
+        // Interjections stay, and since macOS 0.9.18 that is a decision rather than a side effect
+        // of the length gate: «угу», «ага», «мхм» are agreement, they carry meaning unlike
+        // mumbling, and a dictation of a single «Ага.» would come back empty. They are out of the
+        // unconditional list entirely — everything in it must fit the two-letter gate.
+        Check("interjections are left alone",
             Fillers.Strip("Угу, понял") == "Угу, понял" && Fillers.Strip("Ага, ясно") == "Ага, ясно");
         // The separator BEFORE the filler wins: that is where the end of the sentence sits.
         Check("punctuation before the filler survives",
@@ -134,9 +134,14 @@ public static class SelfTest
             Fillers.Strip("Э-э-э, проверка связи.") == "Проверка связи."
             && Fillers.Strip("Тоже на улицу. э-э, на работу потом.") == "Тоже на улицу. На работу потом."
             && Fillers.Strip("пошёл увольняться. Э-э, но тогда пришёл новый") == "пошёл увольняться. Но тогда пришёл новый");
-        // A lower-case filler in the MIDDLE of a sentence leaves the case alone (spec §6.3).
+        // A filler in the MIDDLE of a sentence leaves the case alone (spec §6.3) — and its own
+        // capital counts for nothing there. The engine writes a filler capitalized as a remark of
+        // its own, and this live line from the macOS history broke the first version of the rule:
+        // "их закрыли, Хмм, потом решили" must not become "закрыли, Потом решили".
         Check("a filler inside a sentence does not capitalize anything",
-            Fillers.Strip("описал выше, хмм, как правильно считать") == "описал выше, как правильно считать");
+            Fillers.Strip("описал выше, хмм, как правильно считать") == "описал выше, как правильно считать"
+            && Fillers.Strip("их закрыли, Хмм, потом решили заниматься")
+                == "их закрыли, потом решили заниматься");
         // A drawn-out REAL word is straightened, never dropped — and only from an explicit list,
         // or "PPC" would become "Pc".
         Check("stretched real words are straightened",
@@ -206,8 +211,18 @@ public static class SelfTest
         // Mixed alphabet is proof of mangling, so one consonant may drift (0.8 here).
         Check("mixed alphabet tolerates one consonant off the skeleton",
             Fix("Спроси у Dпсиcт про это.") == "Спроси у DeepSeek про это.");
+        // Plain Latin needs closeness on top of the skeleton. The bar is 0.5 since macOS 0.9.18,
+        // lowered on a measurement rather than a case: `Depsic` is a live mangling that lands
+        // exactly on 0.50, and over both histories nothing else changed.
         Check("latin candidate needs letter closeness too",
-            Fix("Модель Deepsc отвечает быстро.") == "Модель DeepSeek отвечает быстро.");
+            Fix("Модель Deepsc отвечает быстро.") == "Модель DeepSeek отвечает быстро."
+            && Fix("Claude Code Depsic Tailscale — это инструмент.")
+                == "Claude Code DeepSeek Tailscale — это инструмент.");
+        // ⚠️ What keeps Greek out of Groq is the skeleton (grk against grq), not this threshold —
+        // the spec used to name the threshold and that was wrong.
+        Check("traps: Greek survives a lower threshold",
+            Untouched("The Greek alphabet is old.")
+            && TermFix.Skeleton("Greek") != TermFix.Skeleton("Groq"));
         Check("cyrillic candidate needs an exact skeleton",
             Fix("Надо чатгпт спросить.") == "Надо ChatGPT спросить."
             && Fix("Дипсик и Клод отвечают.") == "DeepSeek и Клод отвечают.");

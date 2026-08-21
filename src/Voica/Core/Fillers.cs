@@ -20,10 +20,20 @@ namespace Voica;
 /// </summary>
 public static class Fillers
 {
-    /// <summary>Collapsed forms that are rubbish in full and go even without being drawn out.</summary>
-    // «эм» is NOT a filler: that is how the engine writes GigaAM — «Джига Эм».
+    /// <summary>
+    /// Collapsed forms that are rubbish in full and go even without being drawn out.
+    ///
+    /// ⚠️ Every entry must be at most two letters — that is all the length gate below lets through,
+    /// so anything longer would lie here dead. «мхм», «угу» and «ага» used to (found by comparing
+    /// the two platforms, macOS 0.9.18).
+    ///
+    /// «Угу», «ага» and «мхм» are NOT removed, and that is a decision rather than the gate: they
+    /// are agreement, they carry meaning unlike mumbling, and a dictation of a single «Ага.» would
+    /// come back empty. Same argument that straightens «ну-у-у» instead of dropping it. «эм» is out
+    /// for a different reason: that is how the engine writes GigaAM — «Джига Эм».
+    /// </summary>
     private static readonly HashSet<string> FillerWords = new(StringComparer.Ordinal)
-        { "хм", "мхм", "угу", "ага", "э" };
+        { "хм", "э" };
 
     /// <summary>
     /// Real words that were merely drawn out: straightened, never dropped. The list is explicit
@@ -66,7 +76,7 @@ public static class Fillers
 
         var result = new StringBuilder(text.Length);
         string word = "", sep = "", prevWord = "", sepAfter = "";
-        bool dropped = false, didDrop = false, pendingCapital = false;
+        bool dropped = false, didDrop = false, pendingCapital = false, droppedWasUpper = false;
 
         void Flush()
         {
@@ -100,11 +110,10 @@ public static class Fillers
                 // хмм всяких" became "проверкався ких".
                 dropped = true;
                 didDrop = true;
-                // A capital on the filler means it stood at the start of a sentence, so the word
-                // taking its place has to start with one. Whether that sentence is the first of
-                // the text makes no difference — the run over the whole history is what showed it:
-                // "…на улицу. Э-э, на работу" came out as "…на улицу. на работу".
-                if (char.IsUpper(word[0])) pendingCapital = true;
+                // The filler's own case hints that it opened a sentence, but the decision is not
+                // made here: the separator the next word will inherit has not been chosen yet
+                // (see PickSeparator).
+                droppedWasUpper = char.IsUpper(word[0]);
                 word = "";
                 return;
             }
@@ -133,9 +142,17 @@ public static class Fillers
             // sentence sits, while after the filler there is usually just the comma that set it
             // off. Otherwise «Почему? А-а, как бы» lost its question mark.
             if (!HasPunct(sep) && HasPunct(sepAfter)) sep = sepAfter;
-            // A separator that ends a sentence means the filler stood at its start, whatever case
-            // the filler itself had: "…улицу. э-э, на работу" needs "На" just as much.
-            if (EndsSentence(sep)) pendingCapital = true;
+            // Capitalize the next word if the filler opened a sentence. Only now can that be
+            // decided: there were two separators around the filler and exactly one survived, and it
+            // is the one that says whether a sentence ended.
+            //
+            // ⚠️ The filler's OWN case counts only at the very start of the text, where there is no
+            // separator to its left. In the middle it lies: the engine writes a filler capitalized
+            // as a remark of its own, and "их закрыли, Хмм, потом решили" produced "закрыли, Потом"
+            // — a live line from the macOS history, and the same rule written from the brief broke
+            // on it there before it could break here.
+            if ((result.Length == 0 && droppedWasUpper) || EndsSentence(sep)) pendingCapital = true;
+            droppedWasUpper = false;
             sepAfter = "";
             dropped = false;
         }

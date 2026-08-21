@@ -82,9 +82,11 @@ public static class S
     public static string LblEngine => Loc.T("Recognition engine", "Движок распознавания");
     public static string EngineCloud => Loc.T("Cloud (Groq Whisper)", "Облако (Groq Whisper)");
     public static string EngineLocal => Loc.T("Local (offline, Russian)", "Локально (офлайн, русский)");
+    // Mirrors macOS 0.9.18: since §6.2/§6.3 the rules work on both engines, and the local one is
+    // where they help most — the old wording made the vocabulary sound cloud-only.
     public static string EngineHint => Loc.T(
-        "Local runs entirely on this PC — no network, no API key (model: GigaAM v3, Russian with punctuation). The vocabulary hint works only with the cloud engine; AI term correction works with both.",
-        "Локальный движок работает целиком на этом ПК — без сети и ключа (модель GigaAM v3, русский с пунктуацией). Подсказка-словарь работает только с облаком; ИИ-исправление — с обоими движками.");
+        "The local engine runs entirely on this PC: no internet or API key needed, punctuation included (model: GigaAM v3, Russian). Trade-offs: English words may come out in Cyrillic, and the vocabulary hint during recognition only works with the cloud engine. Terms are still fixed by rules — no key, no network — and that is where the rules help most.",
+        "Локальный движок работает целиком на этом ПК: не нужны ни интернет, ни ключ, пунктуация — из коробки (модель GigaAM v3, русский). Особенности: английские слова могут записаться кириллицей, а словарь-подсказка при распознавании работает только с облаком. Термины при этом всё равно исправляются правилами — без ключа и сети, и пользы от них тут больше всего.");
     public static string ModelNotDownloadedFmt => Loc.T(
         "Local model is not downloaded ({0} MB). Cloud is used until it is.",
         "Локальная модель не скачана ({0} МБ). Пока используется облако.");
