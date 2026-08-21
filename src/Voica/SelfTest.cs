@@ -533,7 +533,14 @@ public static class SelfTest
         Check("hotkey combo storage round-trip", HotkeyBinding.Parse(comboKey.ToStorage()) == comboKey);
         Check("hotkey combo display", comboKey.DisplayName() == "Ctrl+Shift+Space");
         Check("hotkey combo valid", comboKey.IsValid());
-        Check("hotkey bare letter invalid", !(new HotkeyBinding { MainVk = 0x41 }).IsValid());        // bare 'A'
+        // Two keys are a valid combination — one modifier plus a main key. Asked about directly:
+        // three keys were never a requirement.
+        Check("hotkey two-key combos are valid",
+            new HotkeyBinding { Ctrl = true, MainVk = HotkeyBinding.VK_SPACE }.IsValid()
+            && new HotkeyBinding { Alt = true, MainVk = 0x51 }.IsValid()          // Alt+Q
+            && new HotkeyBinding { Win = true, MainVk = 0x5A }.IsValid());        // Win+Z
+        Check("hotkey bare letter invalid",
+ !(new HotkeyBinding { MainVk = 0x41 }).IsValid());        // bare 'A'
         Check("hotkey bare ctrl invalid", !(new HotkeyBinding { MainVk = HotkeyBinding.VK_LCONTROL }).IsValid());
         Check("hotkey bare capslock valid", new HotkeyBinding { MainVk = HotkeyBinding.VK_CAPITAL }.IsValid());
         Check("hotkey parse fallback to default", HotkeyBinding.Parse("garbage") == HotkeyBinding.Default);
