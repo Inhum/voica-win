@@ -206,10 +206,23 @@ public sealed class DictationController : IDisposable
             {
                 var finalText = result.Text;
 
-                // Deterministic term fixing (spec §6.2): rules, so no key and no network, and it
-                // runs BEFORE the LLM pass — the model gets an already tidied text and is left with
-                // what needs understanding. On with a non-empty vocabulary, no setting of its own.
-                var ruled = TermFix.Apply(finalText, Prefs.Vocabulary);
+                // Rules first, model second (spec §6.3 → §6.2 → §6.1): no key and no network, and
+                // the model is left with only what needs understanding. Each rule has its own
+                // switch, because one that ever gets somebody's words wrong must be escapable
+                // without an app update.
+                if (Prefs.RemoveFillers)
+                {
+                    // Filler removal goes first: it deletes what was said, so it must not run over
+                    // text the term rules have already rewritten.
+                    var stripped = Fillers.Strip(finalText);
+                    if (!string.Equals(stripped, finalText, StringComparison.Ordinal))
+                    {
+                        Log.Info("fillers: removed");
+                        finalText = stripped;
+                    }
+                }
+
+                var ruled = Prefs.FixTermsByRules ? TermFix.Apply(finalText, Prefs.Vocabulary) : finalText;
                 if (!string.Equals(ruled, finalText, StringComparison.Ordinal))
                 {
                     Log.Info("term rules: corrected");
@@ -229,6 +242,18 @@ public sealed class DictationController : IDisposable
                         Log.Info($"llm post-process: corrected ({beforeLlm.Length} → {finalText.Length} chars)");
                     else
                         Log.Info("llm post-process: no changes (or skipped/fail-open)");
+                }
+
+                // Quotation marks last, in the single delivery point (spec §6.4): both the engine
+                // and the model leave unpaired quotes behind, and there is no telling which did.
+                if (Prefs.FixQuotes)
+                {
+                    var quoted = Quotes.Balance(finalText);
+                    if (!string.Equals(quoted, finalText, StringComparison.Ordinal))
+                    {
+                        Log.Info("quotes: fixed");
+                        finalText = quoted;
+                    }
                 }
 
                 Deliver(finalText);

@@ -339,6 +339,9 @@ public static class TermFix
 
     private static bool IsVowel(char c) => c is 'a' or 'e' or 'i' or 'o' or 'u' or 'y';
 
+    /// <summary>Cyrillic letter — also what §6.4 uses to decide that guillemets belong.</summary>
+    internal static bool IsCyrillicLetter(char c) => IsCyrillic(char.ToLowerInvariant(c));
+
     private static bool IsCyrillic(char c) => c >= 'Ѐ' && c <= 'ӿ';
 
     /// <summary>Cyrillic → Latin, for skeleton purposes only: it has to be stable, not pretty.</summary>

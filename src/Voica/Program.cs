@@ -22,9 +22,10 @@ public static class Program
             return SelfTest.Run() ? 0 : 1;
         }
 
-        // Rule-check tool (spec §6.2): run the deterministic term fixing over a corpus of past
-        // dictations and print only the lines it changed. Thresholds are set from data, not from
-        // intuition, and every change the whole history produces has to be justified.
+        // Rule-check tool (spec §6.2/§6.3/§6.4): run the text rules over a corpus of past
+        // dictations and print only the lines they changed. Unit tests do not catch these defects —
+        // on macOS 172 of them were green while a run over live dictations found five in a row — so
+        // every threshold change has to be justified over the whole history first.
         int corpusArg = Array.FindIndex(args, a => a.Equals("--normalize-corpus", StringComparison.OrdinalIgnoreCase));
         if (corpusArg >= 0)
         {
@@ -54,7 +55,9 @@ public static class Program
         {
             if (line.Length == 0) continue;
             lines++;
-            var fixedLine = TermFix.Apply(line, vocabulary);
+            // The whole rule chain in delivery order (spec §6.3 → §6.2 → §6.4), regardless of the
+            // switches: the point is to see what the rules would do, not what is enabled today.
+            var fixedLine = Quotes.Balance(TermFix.Apply(Fillers.Strip(line), vocabulary));
             if (string.Equals(fixedLine, line, StringComparison.Ordinal)) continue;
             changed++;
             Console.WriteLine($"--- {line}");

@@ -25,6 +25,9 @@ public sealed class LocalEngine : IDisposable
     public const int OverlapSeconds = 2;
     /// <summary>Cap on how many words the seam de-duplication compares.</summary>
     private const int MaxOverlapWords = 12;
+    /// <summary>Glued comparison needs this much text: on short pieces any two phrases look alike.</summary>
+    private const int MinGluedChars = 10;
+    private const double MinGluedSimilarity = 0.8;
 
     private static readonly TimeSpan IdleUnload = TimeSpan.FromMinutes(5);
 
@@ -101,6 +104,11 @@ public sealed class LocalEngine : IDisposable
         if (cut > 0 && pw.Length > 1 && TryJoin(prev[..cut], pw[..^1], nw, out var withoutStub))
             return withoutStub;
 
+        // Word by word found nothing — the windows may have split the same place into a DIFFERENT
+        // number of words, and then the alignment breaks in principle rather than by a threshold.
+        if (GluedOverlap(pw, nw) is { } drop)
+            return prev + " " + string.Join(' ', nw.Skip(drop));
+
         return prev + " " + next;
     }
 
@@ -137,6 +145,44 @@ public sealed class LocalEngine : IDisposable
         }
         result = string.Empty;
         return false;
+    }
+
+    /// <summary>
+    /// Fallback search for the overlap, for when comparing word by word cannot work: the windows
+    /// split the same place into a DIFFERENT number of words, so a word-to-word alignment has
+    /// nothing to line up. Live cases: one window heard "3кар" where its neighbour heard "Три кар"
+    /// — four words against five.
+    ///
+    /// The comparison is over the words glued together without spaces, because it is exactly the
+    /// word boundaries that moved. It looks for the longest pair "j words from the end of prev, k
+    /// words from the start of next" that is similar above the threshold, and returns how many
+    /// words of next to drop.
+    ///
+    /// ⚠️ ONLY as a fallback, after word-by-word found nothing: gluing compares noticeably more
+    /// loosely, and running it first risks eating text that belongs. The ten-character floor is
+    /// there for the same reason — on short pieces any two phrases look alike.
+    /// </summary>
+    private static int? GluedOverlap(string[] pw, string[] nw)
+    {
+        static string Glue(IEnumerable<string> words) =>
+            new string(string.Concat(words).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        int? bestDrop = null;
+        int bestWeight = 0;
+        for (int j = 1; j <= Math.Min(MaxOverlapWords, pw.Length); j++)
+        {
+            var tail = Glue(pw.Skip(pw.Length - j));
+            if (tail.Length < MinGluedChars) continue;
+            for (int k = 1; k <= Math.Min(MaxOverlapWords, nw.Length); k++)
+            {
+                var head = Glue(nw.Take(k));
+                if (head.Length < MinGluedChars) continue;
+                if (TermFix.Similarity(tail, head) < MinGluedSimilarity) continue;
+                int weight = tail.Length + head.Length;
+                if (bestDrop is null || weight > bestWeight) { bestDrop = k; bestWeight = weight; }
+            }
+        }
+        return bestDrop;
     }
 
     /// <summary>

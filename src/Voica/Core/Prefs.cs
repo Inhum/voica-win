@@ -42,6 +42,12 @@ public static class Prefs
         public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
         public bool ShowOverlay { get; set; } = true;            // spec §4.2, on by default
+
+        // Rules that change words each get their own switch (spec §6.2/§6.3/§6.4): without one, a
+        // rule that ever gets somebody's words wrong could only be escaped by updating the app.
+        public bool RemoveFillers { get; set; } = true;           // spec §6.3, on by default
+        public bool FixQuotes { get; set; } = true;               // spec §6.4, on by default
+        public bool FixTermsByRules { get; set; } = true;         // spec §6.2, on by default
     }
 
     private static Data Load()
@@ -167,6 +173,27 @@ public static class Prefs
     {
         get { lock (Gate) return _data.LlmPostProcess; }
         set { lock (Gate) { _data.LlmPostProcess = value; Save(); } }
+    }
+
+    /// <summary>Whether filler sounds are removed by rule (spec §6.3, on by default).</summary>
+    public static bool RemoveFillers
+    {
+        get { lock (Gate) return _data.RemoveFillers; }
+        set { lock (Gate) { _data.RemoveFillers = value; Save(); } }
+    }
+
+    /// <summary>Whether quotation marks are straightened and balanced on delivery (spec §6.4).</summary>
+    public static bool FixQuotes
+    {
+        get { lock (Gate) return _data.FixQuotes; }
+        set { lock (Gate) { _data.FixQuotes = value; Save(); } }
+    }
+
+    /// <summary>Whether vocabulary terms are fixed by rule (spec §6.2, on by default).</summary>
+    public static bool FixTermsByRules
+    {
+        get { lock (Gate) return _data.FixTermsByRules; }
+        set { lock (Gate) { _data.FixTermsByRules = value; Save(); } }
     }
 
     /// <summary>

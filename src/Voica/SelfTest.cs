@@ -107,6 +107,78 @@ public static class SelfTest
             && !LayoutSwitch.CollidesWithLayoutSwitch(
                 new HotkeyBinding { Ctrl = true, Shift = true, MainVk = HotkeyBinding.VK_SPACE }));
 
+        // --- Filler removal (spec §6.3) ---
+        // Every caveat below is a line of live text that broke. Unit tests alone did not catch
+        // them: the run over the whole history did.
+        Check("collapsing folds hyphens and repeats",
+            Fillers.Collapsed("Э-э-э") == "э" && Fillers.Collapsed("эээ") == "э"
+            && Fillers.Collapsed("хмм") == "хм" && Fillers.Collapsed("Ну-у-у") == "ну"
+            && Fillers.Collapsed("мама") == "мама");
+        Check("drawn-out sounds go, with the sentence left intact",
+            Fillers.Strip("Ну, эээ, дальше") == "Ну, дальше"
+            && Fillers.Strip("проверка хмм всяких штук") == "проверка всяких штук"
+            && Fillers.Strip("Хм, понял") == "Понял");
+        // Three-letter interjections stay: the collapsed form has to be one or two letters, and
+        // «угу»/«ага» are three. The spec's prose calls them two-letter and lists them among the
+        // removable ones, but the reference gates on length exactly this way, so they never fire
+        // there either — mirrored deliberately, and reported back rather than "fixed" here.
+        Check("three-letter interjections are left alone",
+            Fillers.Strip("Угу, понял") == "Угу, понял" && Fillers.Strip("Ага, ясно") == "Ага, ясно");
+        // The separator BEFORE the filler wins: that is where the end of the sentence sits.
+        Check("punctuation before the filler survives",
+            Fillers.Strip("Почему? А-а, как бы") == "Почему? Как бы");
+        // Both live cases from the run over the whole history: a filler can open a sentence in the
+        // middle of the text, and it can be lower case there — the full stop before it says just as
+        // much as its own capital would.
+        Check("a filler opening the sentence hands over the capital",
+            Fillers.Strip("Э-э-э, проверка связи.") == "Проверка связи."
+            && Fillers.Strip("Тоже на улицу. э-э, на работу потом.") == "Тоже на улицу. На работу потом."
+            && Fillers.Strip("пошёл увольняться. Э-э, но тогда пришёл новый") == "пошёл увольняться. Но тогда пришёл новый");
+        // A lower-case filler in the MIDDLE of a sentence leaves the case alone (spec §6.3).
+        Check("a filler inside a sentence does not capitalize anything",
+            Fillers.Strip("описал выше, хмм, как правильно считать") == "описал выше, как правильно считать");
+        // A drawn-out REAL word is straightened, never dropped — and only from an explicit list,
+        // or "PPC" would become "Pc".
+        Check("stretched real words are straightened",
+            Fillers.Strip("Ну-у-у ладно") == "Ну ладно" && Fillers.Strip("ноо потом") == "но потом");
+        Check("traps: numbers, abbreviations and millimetres are untouched",
+            Fillers.Strip("Сто рублей, 100 штук") == "Сто рублей, 100 штук"
+            && Fillers.Strip("Проверка ии.") == "Проверка ии."
+            && Fillers.Strip("Джига Эм работает") == "Джига Эм работает"
+            && Fillers.Strip("длина 5 мм") == "длина 5 мм"
+            && Fillers.Strip("PPC и All") == "PPC и All");
+        // Single sounds are conjunctions and prepositions until they are drawn out.
+        Check("traps: undrawn single sounds are words",
+            Fillers.Strip("а он у окна") == "а он у окна"
+            && Fillers.Strip("о работе") == "о работе");
+        Check("nothing removed means nothing reformatted",
+            Fillers.Strip("контрагентов. ..") == "контрагентов. .."
+            && Fillers.Strip("") == "" && Fillers.Strip("Просто текст.") == "Просто текст.");
+
+        // --- Quotation marks (spec §6.4) ---
+        Check("straight quotes become guillemets by position",
+            Quotes.Smart("Он сказал \"да\" вчера") == "Он сказал «да» вчера"
+            && Quotes.Smart("в ответ:\"Давай\"") == "в ответ: «Давай»");
+        Check("english text keeps its straight quotes",
+            Quotes.Smart("He said \"yes\" today") == "He said \"yes\" today");
+        // The live case: the speaker quoted the whole phrase, the engine closed after one word.
+        Check("a premature closer is dropped, not the surplus one",
+            Quotes.Balance("«Да\", это стопроцентный вариант\"") == "«Да, это стопроцентный вариант»");
+        Check("with no premature closer the surplus one goes",
+            Quotes.Balance("Он сказал «да». Потом ушёл»") == "Он сказал «да». Потом ушёл");
+        Check("an unclosed opener is removed, never closed",
+            Quotes.Balance("сказал: «На, занимайся") == "сказал: На, занимайся");
+        Check("balanced text is left alone",
+            Quotes.Balance("Он сказал «да».") == "Он сказал «да»."
+            && Quotes.Balance("Plain english text.") == "Plain english text.");
+
+        // --- Rule switches (spec §6.2/§6.3/§6.4) ---
+        var ruleSnapshot = (Prefs.RemoveFillers, Prefs.FixQuotes, Prefs.FixTermsByRules);
+        Prefs.RemoveFillers = false; Prefs.FixQuotes = false; Prefs.FixTermsByRules = false;
+        Check("each rule switch persists",
+            !Prefs.RemoveFillers && !Prefs.FixQuotes && !Prefs.FixTermsByRules);
+        (Prefs.RemoveFillers, Prefs.FixQuotes, Prefs.FixTermsByRules) = ruleSnapshot;
+
         // --- Deterministic term fixing (spec §6.2) ---
         // Fixtures frozen from the methodology run of 2026-08-20: the rules were driven over the
         // whole real history (24 dictations, 0 changes — plain Russian business speech) plus this
@@ -371,11 +443,23 @@ public static class SelfTest
                 "по второму сотруднику управляющий филиала сказал: «Подожди",
                 "Сотруднику управляющего филиала сказал: «Подожди, пока ничего не отвечай»")
             == "по второму сотруднику управляющий филиала сказал: «Подожди пока ничего не отвечай»");
-        // The forgiveness needs a run to hide in: three words with one wrong is not a match.
+
+        // Windows can split the same place into a DIFFERENT number of words, and then word-by-word
+        // alignment has nothing to line up (spec §2.5, macOS 0.9.17).
+        Check("stitch falls back to comparing the glued words",
+            LocalEngine.StitchOverlap(
+                "мы поставили 3кар на площадку",
+                "Три кар на площадку и уехали")
+            == "мы поставили 3кар на площадку и уехали");
+        // The glued comparison is looser, so it needs real length: short pieces all look alike.
+        Check("glued fallback needs ten characters",
+            LocalEngine.StitchOverlap("это дом", "том большой") == "это дом том большой");
+        // The word-level rule must not forgive inside a short run either — and the pieces here are
+        // too short for the glued fallback to reach for them.
         Check("stitch does not forgive inside a short run",
-            LocalEngine.StitchOverlap("поставил стол у стены", "стул у стены и ушёл")
-            == "поставил стол у стены стул у стены и ушёл");
+            LocalEngine.StitchOverlap("он взял стол", "стул и ушёл") == "он взял стол стул и ушёл");
         Check("stitch handles empty",
+
             LocalEngine.StitchOverlap("", "мир") == "мир" && LocalEngine.StitchOverlap("привет", "") == "привет");
 
         var savedEngine = Prefs.Engine;
@@ -542,7 +626,9 @@ public static class SelfTest
             && Prefs.StoreAudio && Prefs.Vocabulary == "" && Prefs.CheckUpdatesOnLaunch
             && Prefs.NotifyOnInsert && !Prefs.LlmPostProcess
             && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto"
-            && Prefs.DoubleTapToStart && Prefs.ShowOverlay);
+            && Prefs.DoubleTapToStart && Prefs.ShowOverlay
+            // Rules that change words are ON by default (spec §6.2/§6.3/§6.4).
+            && Prefs.RemoveFillers && Prefs.FixQuotes && Prefs.FixTermsByRules);
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;

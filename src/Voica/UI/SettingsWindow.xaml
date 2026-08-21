@@ -54,6 +54,12 @@
                         <Button x:Name="SaveKeyButton" Content="{x:Static l:S.BtnSave}" Width="76" Height="26" Click="OnSaveKey" />
                     </StackPanel>
                     <TextBlock x:Name="KeyStatusText" Margin="0,6,0,0" Opacity="0.8" TextWrapping="Wrap" />
+                    <!-- First run without a key must not be a dead end (spec §11.3): shown only
+                         with the cloud engine selected AND no key, in normal colour — three grey
+                         hints already sit nearby and a fourth would be lost among them. No button
+                         on purpose: the engine switch is right above and visible. -->
+                    <TextBlock x:Name="NoKeyHint" Visibility="Collapsed" Margin="0,6,0,0"
+                               TextWrapping="Wrap" Text="{x:Static l:S.KeyNoKeyHint}" />
 
                     <Separator Margin="0,12" />
 
@@ -123,6 +129,31 @@
 
                     <CheckBox x:Name="NotifyInsertCheck" Content="{x:Static l:S.ChkNotify}" Margin="0,12,0,0"
                               Checked="OnNotifyInsertChanged" Unchecked="OnNotifyInsertChanged" />
+
+                    <Separator Margin="0,12" />
+
+                    <!-- Rules that change words (spec §6.3/§6.4) — each with its own switch, so a
+                         rule that ever gets somebody's words wrong can be escaped without an
+                         app update. -->
+                    <TextBlock Text="{x:Static l:S.LblCleanup}" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,6" />
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="FillersCheck" Content="{x:Static l:S.ChkFillers}" VerticalAlignment="Center"
+                                  Checked="OnFillersChanged" Unchecked="OnFillersChanged" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.FillersHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <CheckBox x:Name="QuotesCheck" Content="{x:Static l:S.ChkQuotes}" VerticalAlignment="Center"
+                                  Checked="OnQuotesChanged" Unchecked="OnQuotesChanged" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.QuotesHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
 
@@ -143,6 +174,18 @@
                     <TextBlock x:Name="VocabCounter" HorizontalAlignment="Right" Opacity="0.7" Margin="0,2,0,0" />
 
                     <Separator Margin="0,12" />
+
+                    <!-- Rules first, AI second (spec §6.2 above §6.1): what always works and costs
+                         nothing, then the optional extra on top. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <CheckBox x:Name="TermRulesCheck" Content="{x:Static l:S.ChkTermRules}" VerticalAlignment="Center"
+                                  Checked="OnTermRulesChanged" Unchecked="OnTermRulesChanged" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.TermRulesHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <CheckBox x:Name="LlmCheck" Content="{x:Static l:S.ChkLlm}" VerticalAlignment="Center"

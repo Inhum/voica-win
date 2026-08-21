@@ -55,6 +55,10 @@ public partial class SettingsWindow : Window
         RetentionBox.Text = Prefs.RetentionDays.ToString();
         VocabularyBox.Text = Prefs.Vocabulary;
         UpdateVocabCounter();
+        // Rules that change words, each with its own switch (spec §6.2/§6.3/§6.4).
+        FillersCheck.IsChecked = Prefs.RemoveFillers;
+        QuotesCheck.IsChecked = Prefs.FixQuotes;
+        TermRulesCheck.IsChecked = Prefs.FixTermsByRules;
         LlmCheck.IsChecked = Prefs.LlmPostProcess;
         LlmStatusText.Text = "";
         ChatModelPanel.Visibility = Prefs.LlmPostProcess ? Visibility.Visible : Visibility.Collapsed;
@@ -82,6 +86,7 @@ public partial class SettingsWindow : Window
         if (Prefs.Engine == EngineKind.Local && !ModelManager.IsInstalled() && _downloadCts is null)
             _ = DownloadModelAsync();
         RefreshModelStatus();
+        RefreshNoKeyHint();   // the way out of "no key" depends on which engine is selected (§11.3)
     }
 
     private void RefreshModelStatus()
@@ -265,6 +270,26 @@ public partial class SettingsWindow : Window
 
     // --- AI term correction (spec §6.1) ---
 
+    // --- Rules that change words (spec §6.2/§6.3/§6.4) ---
+
+    private void OnFillersChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.RemoveFillers = FillersCheck.IsChecked == true;
+    }
+
+    private void OnQuotesChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.FixQuotes = QuotesCheck.IsChecked == true;
+    }
+
+    private void OnTermRulesChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.FixTermsByRules = TermRulesCheck.IsChecked == true;
+    }
+
     private void OnLlmChanged(object sender, RoutedEventArgs e)
     {
         if (!_loaded) return;
@@ -366,6 +391,20 @@ public partial class SettingsWindow : Window
             KeyStatusText.Text = S.KeyEnv;
         else
             KeyStatusText.Text = S.KeyNone;
+        RefreshNoKeyHint();
+    }
+
+    /// <summary>
+    /// The first run without a key must not read as a dead end (spec §11.3): the local engine needs
+    /// neither key nor internet, and that is said right under the key field, where the cursor is on
+    /// first launch. Shown only while the cloud engine is selected AND there is no key — with a key
+    /// the cloud works, with the local engine the key is not needed.
+    /// </summary>
+    private void RefreshNoKeyHint()
+    {
+        bool cloudSelected = EngineCombo.SelectedIndex != 1;
+        bool hasKey = KeyStore.Load() is not null;
+        NoKeyHint.Visibility = cloudSelected && !hasKey ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void OnValidateKey(object sender, RoutedEventArgs e)

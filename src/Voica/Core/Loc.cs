@@ -164,6 +164,32 @@ public static class S
     public static string VocabCounterFmt => "{0} / {1}";
 
     // AI term correction (spec §6.1)
+    // Text clean-up (spec §6.3/§6.4) — rules that change words, each with its own switch.
+    public static string LblCleanup => Loc.T("Text clean-up", "Очистка текста");
+    public static string ChkFillers => Loc.T(
+        "Remove \"uh\", \"um\", \"hmm\"",
+        "Убирать «э-э-э», «ммм», «хмм»");
+    public static string FillersHint => Loc.T(
+        "Drawn-out sounds that mean nothing in speech but clutter the text. Removed by rules, no network needed. Real words that were merely drawn out are straightened rather than dropped. Turn this off if you transcribe speech verbatim.",
+        "Тянущиеся звуки, которые в речи не значат ничего, а в тексте мешают. Убираются по правилам, без сети. Растянутые настоящие слова не удаляются, а распрямляются: «ну-у-у» → «ну». Выключите, если расшифровываете речь дословно.");
+    public static string ChkQuotes => Loc.T("Fix quotation marks", "Чинить кавычки");
+    public static string QuotesHint => Loc.T(
+        "Straight quotes become proper guillemets, unpaired ones are removed, and a missing space after a colon is restored. Recognition places quotes however it happens to — one sentence can hold both kinds. English text is left alone.",
+        "Прямые кавычки заменяются ёлочками, непарные убираются, восстанавливается пробел после двоеточия. Распознавание ставит кавычки как придётся — в одной фразе встречаются и «ёлочки», и \"прямые\". Английский текст не трогается.");
+
+    // Term rules (spec §6.2) — the switch sits above the AI pass: first what always works and
+    // costs nothing, then the optional extra.
+    public static string ChkTermRules => Loc.T("Fix terms by rules", "Исправлять термины правилами");
+    public static string TermRulesHint => Loc.T(
+        "Garbled spellings are pulled back to the ones you listed, right on this PC: no key, no internet, both engines. The rules stay quiet when unsure. Turn this off if they ever get one of your words wrong.",
+        "Искажённые написания подтягиваются к словарным прямо на этом ПК: без ключа, без интернета, на обоих движках. Правила осторожны — если слово ни на что не похоже, они его не трогают. Выключите, если правило когда-нибудь ошибётся на ваших словах.");
+
+    // First run without a key (spec §11.3): the key field is where the cursor is, so the way out
+    // is said right there — and deliberately without a button.
+    public static string KeyNoKeyHint => Loc.T(
+        "No key? It's only needed for the cloud engine. Switch recognition to \"Local (offline)\" above — it runs with no key and no internet.",
+        "Ключа нет? Он нужен только облачному движку. Переключите распознавание на «Локально (офлайн)» выше — оно работает без ключа и без интернета.");
+
     public static string ChkLlm => Loc.T(
         "Fix terms with AI (extra Groq request)",
         "Исправлять термины через ИИ (доп. запрос к Groq)");
