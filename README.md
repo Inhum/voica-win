@@ -70,6 +70,16 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
     produced, so it never makes things worse.
 
   More: [Словарь терминов и ИИ-исправление](docs/terms-ai.ru.md) (in Russian).
+- **Text clean-up** — two more rules that run without a key or a network, both on by default and
+  both switchable:
+  - **Filler sounds go** — the drawn-out "э-э-э", "ммм", "хмм" that mean nothing in speech and
+    clutter the text. The rule reads the shape of a word, not a list of spellings, so it catches
+    every way recognition happens to spell a mumble. A real word that was merely drawn out is
+    straightened rather than dropped ("ну-у-у" → "ну"), and numbers, abbreviations and millimetres
+    are left alone. Turn it off if you transcribe speech verbatim — it deletes what was said.
+  - **Quotation marks are repaired** — straight quotes become guillemets by position, a missing
+    space after a colon comes back, and unpaired quotes are removed. Recognition places quotes
+    however it happens to, and the AI pass adds its own; English text is left alone.
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.
 - **Privacy** — no backend, no telemetry. Network is used only for Groq (cloud transcription /
@@ -184,6 +194,9 @@ reflects state instead: idle (blue), recording (pulsing red), transcribing (ambe
 | Check for updates on launch | Once a day, opt‑in |
 | Delete audio older than | N days; 0 = keep forever |
 | Vocabulary | Terms fixed by rule on both engines; also a cloud hint (last 800 chars used) |
+| Fix terms by rules | On by default; the rules that need no key or network |
+| Remove "uh", "um", "hmm" | On by default; off if you transcribe verbatim |
+| Fix quotation marks | On by default; guillemets, pairing, space after a colon |
 | Fix terms with AI | Optional Groq pass on top of the rules; off by default |
 | Groq API key | Validate + Save (DPAPI); **Show** to reveal |
 | Delete all data… | Wipes history, audio, key, settings (random‑phrase confirmation) |
