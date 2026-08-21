@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-08-21
+
+### Added
+- **Filler sounds are removed** (spec §6.3), on by default and switchable. The drawn-out "э-э-э",
+  "ммм", "хмм" mean nothing in speech and clutter the text. The rule reads the SHAPE of a word
+  rather than a list of spellings — a token that collapses to one or two letters once hyphens and
+  repeats are folded — because recognition spells the same mumble differently every time. What it
+  deliberately leaves alone is the interesting part, and every item is a line of live text that
+  broke: single sounds go only when they were drawn out ("а" is a conjunction, "у" and "о" are
+  prepositions), "и" is never touched at all (the engine writes the abbreviation "ИИ" in lower case
+  too), "эм" is not a filler (that is how it writes GigaAM), numbers and all-caps abbreviations are
+  untouchable, and "мм" after a number is millimetres. A real word that was merely drawn out gets
+  straightened rather than dropped — "Ну-у-у" → "Ну" — from an explicit list, because straightening
+  everything would turn "PPC" into "Pc". Unlike the term rules this one has a setting: it deletes
+  what was said, which is wrong for anyone transcribing speech verbatim.
+- **Quotation marks are repaired** (spec §6.4), on by default and switchable. Straight quotes become
+  guillemets decided by position, a space missing after a colon comes back, and unpaired marks are
+  removed. It runs last, in the single delivery point, after both the rules and the AI pass — the
+  engine decodes greedily and cannot remember that a quote is open, the model wraps substituted
+  terms in quotes against the prompt, and there is no telling which of them left the mess.
+- **A switch for each rule that changes words** (spec §6.2/§6.3/§6.4), all on by default: filler
+  removal and quote repair under "Text clean-up" on the Dictation tab, term rules on Vocabulary
+  above the AI pass — first what always works and costs nothing, then the optional extra. Without
+  switches, a rule that ever got somebody's words wrong could only be escaped by updating the app.
+- **The first run without a key is no longer a dead end** (spec §11.3). A line under the key field
+  says the local engine needs neither key nor internet, shown only while the cloud engine is
+  selected and no key is saved. No button on purpose: the engine switch is right above it, and a
+  button would invite a 400 MB download before the reason for it is clear.
+
+### Fixed
+- **Windows that split the same place into a different number of words no longer duplicate it**
+  (spec §2.5). "3кар" against "Три кар" is four words against five, and word-by-word alignment has
+  nothing to line up. A fallback now compares the words glued together without spaces — only after
+  the word-level search comes up empty, and only from ten characters up, because gluing compares
+  loosely and short pieces all look alike.
+- **A filler opening a sentence in the middle of the text left the next word in lower case.** The
+  mandatory run over the whole history caught it three times in one dictation: "…на улицу. Э-э, на
+  работу" came out as "…на улицу. на работу". The capital now follows the sentence, not the start
+  of the text.
+
 ## [0.7.0] - 2026-08-20
 
 ### Added
