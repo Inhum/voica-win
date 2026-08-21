@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-08-21
+
+### Fixed
+- **A capitalized filler in the middle of a sentence no longer capitalizes the next word**
+  (spec §6.3). Recognition writes a filler capitalized as a remark of its own, so "их закрыли,
+  Хмм, потом решили" was coming out as "закрыли, Потом решили". The filler's own case counts only
+  at the very start of the text; everywhere else the surviving separator decides, which is what
+  already handled "…на улицу. э-э, на работу". Found on the macOS side against their history, on
+  the rule this project shipped in 0.8.0.
+
+### Changed
+- **Terms are pulled back from a little further** (spec §6.2): the letter-closeness bar for a
+  plain-Latin candidate is 0.5 rather than 0.6, as the cross-platform spec now sets it. It was
+  measured, not guessed — over one 138-line history the replacements were identical at either
+  value, and here the only thing it adds is `Depsic` → `DeepSeek`, a live mangling that lands
+  exactly on the old bar. "Greek" is still not "Groq": what separates them is the consonant
+  skeleton, not this threshold.
+- The recognition-engine hint says what has been true since 0.8.0: the vocabulary hint during
+  recognition is cloud-only, but the term rules work on both engines — and help the local one most.
+
 ## [0.8.0] - 2026-08-21
 
 ### Added
