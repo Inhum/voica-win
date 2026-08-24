@@ -473,7 +473,14 @@ public static class SelfTest
         // too short for the glued fallback to reach for them.
         Check("stitch does not forgive inside a short run",
             LocalEngine.StitchOverlap("он взял стол", "стул и ушёл") == "он взял стол стул и ушёл");
+        // A chunk of nothing but spaces is not empty but holds zero words, and the glued search
+        // would then run over an empty range — a trap in Swift, an exception elsewhere (spec §2.5).
+        Check("stitch survives a chunk with no words",
+            LocalEngine.StitchOverlap("   ", "привет мир") == "привет мир"
+            && LocalEngine.StitchOverlap("привет мир", "  	 ") == "привет мир"
+            && LocalEngine.StitchOverlap("   ", "  ") == "  ");
         Check("stitch handles empty",
+
 
             LocalEngine.StitchOverlap("", "мир") == "мир" && LocalEngine.StitchOverlap("привет", "") == "привет");
 

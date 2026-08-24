@@ -97,6 +97,12 @@ public sealed class LocalEngine : IDisposable
 
         var pw = prev.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var nw = next.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        // A chunk of nothing but spaces is not empty, yet it holds zero words — and a search over
+        // "the first through the zeroth" word is a trap in Swift and an exception elsewhere. Today
+        // the decoder trims and blank chunks never reach here, but the guard belongs where the
+        // break would be, not where we happen to be lucky (spec §2.5).
+        if (pw.Length == 0) return next;
+        if (nw.Length == 0) return prev;
 
         if (TryJoin(prev, pw, nw, out var joined)) return joined;
 
@@ -166,6 +172,10 @@ public sealed class LocalEngine : IDisposable
     {
         static string Glue(IEnumerable<string> words) =>
             new string(string.Concat(words).Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        // Guarded here too, not only in the caller: this is the function whose loops would run over
+        // an empty range (spec §2.5).
+        if (pw.Length == 0 || nw.Length == 0) return null;
 
         int? bestDrop = null;
         int bestWeight = 0;

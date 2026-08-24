@@ -50,14 +50,19 @@ public static class Program
 
         var vocabulary = Prefs.Vocabulary;
         Console.WriteLine($"vocabulary: {vocabulary}");
+        Console.WriteLine($"rules: fillers={Prefs.RemoveFillers} terms={Prefs.FixTermsByRules} quotes={Prefs.FixQuotes}");
         int lines = 0, changed = 0;
         foreach (var line in File.ReadAllLines(path))
         {
             if (line.Length == 0) continue;
             lines++;
-            // The whole rule chain in delivery order (spec §6.3 → §6.2 → §6.4), regardless of the
-            // switches: the point is to see what the rules would do, not what is enabled today.
-            var fixedLine = Quotes.Balance(TermFix.Apply(Fillers.Strip(line), vocabulary));
+            // The whole rule chain in delivery order (spec §6.3 → §6.2 → §6.4), and it obeys the
+            // switches (spec §6.5): a measurement that ignores them shows something other than what
+            // the user actually gets.
+            var fixedLine = line;
+            if (Prefs.RemoveFillers) fixedLine = Fillers.Strip(fixedLine);
+            if (Prefs.FixTermsByRules) fixedLine = TermFix.Apply(fixedLine, vocabulary);
+            if (Prefs.FixQuotes) fixedLine = Quotes.Balance(fixedLine);
             if (string.Equals(fixedLine, line, StringComparison.Ordinal)) continue;
             changed++;
             Console.WriteLine($"--- {line}");
