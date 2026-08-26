@@ -33,6 +33,15 @@ All notable changes to this project are documented here. The format is based on
   candidate.
 
 ### Fixed
+- **A dictation nothing can transcribe is refused before it is spoken.** §2.5 states this for the
+  missing model; the reason is the person's time, so it holds for the cloud without a key too — that
+  case used to open the recording bar, record for as long as you spoke, and complain at the end.
+- **The model download can be cancelled** — a Cancel button while it runs (macOS has had one; the
+  spec never wrote it down), switching back to the cloud stops it as well, and the partial file is
+  removed rather than left behind.
+- **Deleting the local model asks first**, saying what is freed and what stops working. The engine
+  choice is left alone on purpose: "Local (offline)" is a decision about privacy, and the refusal at
+  the start of a dictation now explains the state instead.
 - **A chosen local engine is never served by the cloud** (spec §2.5). The refusal now comes at the
   start of the dictation, with a dialog offering Settings, instead of the audio quietly going to
   Groq while the switch reads "offline".
@@ -46,7 +55,9 @@ All notable changes to this project are documented here. The format is based on
 - **Identical warnings no longer stack** — previously only the "model is missing" dialog was
   guarded, and it is not the only one reachable twice in a row.
 - **A long status line cannot resize or overflow the Settings window**: status texts are capped and
-  wrap, which a proxy error message made obvious.
+  wrap, which a proxy error message made obvious. The Download/Cancel button no longer slides out
+  from under the cursor when the status text beside it gets shorter, and the language hint moved
+  under an ⓘ dot, which takes 54 px off the Dictation tab (spec §11.4).
 - **A failed background update check takes the daily slot** (spec §10) and stays silent. In a closed
   network the check fails at every launch; the slot is now taken before the request, so it is not
   retried — and only a check the user asked for is allowed to show anything.
