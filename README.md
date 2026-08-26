@@ -198,6 +198,7 @@ reflects state instead: idle (blue), recording (pulsing red), transcribing (ambe
 | Remove "uh", "um", "hmm" | On by default; off if you transcribe verbatim |
 | Fix quotation marks | On by default; guillemets, pairing, space after a colon |
 | Fix terms with AI | Optional Groq pass on top of the rules; off by default |
+| Use the system proxy | On by default (Network tab); off = ignore Windows and go direct |
 | Groq API key | Validate + Save (DPAPI); **Show** to reveal |
 | Delete all data… | Wipes history, audio, key, settings (random‑phrase confirmation) |
 
@@ -227,6 +228,41 @@ Settings → Data. Notes:
   to the local engine automatically and shows a small notice.
 - With the local engine (and AI correction off), audio and text **never leave your PC**.
 - ONNX conversion by [istupakov/gigaam-v3-onnx](https://huggingface.co/istupakov/gigaam-v3-onnx) (MIT).
+
+### Installing the model by hand
+
+Some networks will not let 215 MB through, or will not let Voica out at all (see
+**Behind a corporate proxy** below). The model can be carried in on a USB stick instead: download
+the three files from the
+[model release](https://github.com/Inhum/voica-win/releases/tag/model-gigaam-v3-e2e-ctc-int8-1) on
+any machine and put them, unrenamed, straight into `%APPDATA%\Voica\models\`:
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `v3_e2e_ctc.int8.onnx` | 224 893 347 | `2e3fcb7a7b66030336fd10c2fcfb033bd1dc7e1bf238fe5cfd83b1d0cfc9d28e` |
+| `v3_e2e_ctc.yaml` | 899 | `e67eca3a311ad7c8813d36dff6b8eeba7ad3459fd811d6faea2a26535754a358` |
+| `v3_e2e_ctc_vocab.txt` | 2 007 | `142de7570b3de5b3035ce111a89c228e80e6085273731d944093ddf24fa539cd` |
+
+Voica checks these checksums itself the first time it loads a model it did not download, and
+remembers the answer — so a truncated copy is reported as such instead of turning into gibberish
+recognition. To check them yourself first:
+
+```powershell
+Get-FileHash "$env:APPDATA\Voica\models\v3_e2e_ctc.int8.onnx" -Algorithm SHA256
+```
+
+## Behind a corporate proxy
+
+Voica works where the only way out is a proxy. It uses the proxy Windows is configured with and
+authenticates as the signed-in user, so a domain proxy is answered over SSO — **no password is
+typed into Voica or stored by it**. The switch lives in **Settings → Network**, together with a
+line saying which route requests are actually taking. Turn it off to ignore the system settings and
+go straight out — a proxy left misconfigured in Windows blocks the app just as effectively as a
+missing one.
+
+If the proxy refuses, every message names its address: that is the thing to hand to whoever
+administers it. If it will not be opened, the local engine plus the manual model install above
+gives you an app that needs no network at all.
 
 ## Bring your own Groq key
 

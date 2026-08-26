@@ -51,6 +51,24 @@ line) with the current vocabulary and prints only the lines they changed. Spec �
 mandatory whenever a threshold moves: thresholds come from data, and every change over the whole
 history has to be justified before the result is frozen as a self-test fixture.
 
+**Proxy behaviour (§9.5) is checked with a stub, not by reading code.** There is no proxy at home,
+and the system network settings are off limits for a test, so:
+
+```powershell
+# terminal 1 — Deny answers every request 407; Allow tunnels for real
+.\scripts\fake-proxy.ps1 -Mode Deny
+
+# terminal 2 — VOICA_PROXY overrides the system proxy for this process only
+$env:VOICA_PROXY = "127.0.0.1:18899"
+Start-Process -FilePath "src\Voica\bin\Debug\net8.0-windows10.0.17763.0\Voica.exe" `
+  -ArgumentList "--probe-net" -Wait -NoNewWindow
+```
+
+**`--probe-net`** walks every network surface — key check, chat model, a real (silent) dictation,
+the update check, the model download — and prints what each would tell the user. In Deny mode all
+five must NAME the proxy; anything that prints a raw error code is the §9.5 defect coming back.
+It sends real requests with the saved key.
+
 **Rebuild gotcha:** a running `Voica.exe` locks the output exe. Stop it first:
 `Get-Process Voica -ErrorAction SilentlyContinue | Stop-Process -Force`.
 
@@ -102,6 +120,23 @@ Work proceeds in phases mirroring the macOS app (see the plan / task list): 0 Sc
 2 Storage · 3 Settings+KeyStore · 4 Updater+About+polish · 5 Self-test · 6 Packaging+OSS docs. Each
 phase must end on a clean build with the self-test green. Localization (en/ru) and user-facing
 message wording land in Phase 4; earlier strings are placeholder English.
+
+## Releasing (spec §13)
+
+Everything a user can see goes out as a **candidate first**: tag `vX.Y.Z-rc.N`, which the release
+workflow publishes as a GitHub **pre-release**. GitHub keeps pre-releases out of `/releases/latest`,
+which is where the update check looks (§10), so a candidate never reaches ordinary users while the
+build, the link and the version answer "which one are you running" for a tester.
+
+- `<Version>` in [Voica.csproj](src/Voica/Voica.csproj) stays the **base** `X.Y.Z` the whole time —
+  the suffix lives only in the tag. CI verifies the tag against it and fails on a mismatch.
+- CI stamps the full version (suffix included) into the binary via `-p:InformationalVersion`, so
+  About shows `0.8.2-rc.1`. Everything else — the installer's version fields (Inno only accepts
+  numbers) and the asset names — uses the base version. Only the release title carries the tag.
+- `Updater.IsNewer` compares the numeric core and treats a release as newer than its own candidate,
+  so a tester on `rc.1` is told when the final ships.
+- When nothing is left to fix, tag `vX.Y.Z` with no suffix; that one becomes `latest`. No release
+  branch: candidates are cut from main.
 
 ## Workflow constraints
 
