@@ -185,6 +185,15 @@ public static class GroqClient
 
     /// <summary>Lists model ids the key can see (spec §6.1). Empty on any failure.</summary>
     public static async Task<IReadOnlyList<string>> ListModelsAsync(string apiKey, CancellationToken cancellationToken = default)
+        => (await TryListModelsAsync(apiKey, cancellationToken)).Ids;
+
+    /// <summary>
+    /// The same listing, plus the reason it came back empty. Without it a proxy that answers 407
+    /// reads as "your Groq org has no chat models" (spec §9.5): the request never left the network,
+    /// and the one thing the user needs — the proxy's address — is the thing we threw away.
+    /// </summary>
+    private static async Task<(IReadOnlyList<string> Ids, string? Error)> TryListModelsAsync(
+        string apiKey, CancellationToken cancellationToken = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(ValidateTimeout);
@@ -194,21 +203,28 @@ public static class GroqClient
             using var request = new HttpRequestMessage(HttpMethod.Get, ModelsEndpoint);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
-            if (!response.IsSuccessStatusCode) return Array.Empty<string>();
+            if (!response.IsSuccessStatusCode)
+                return (Array.Empty<string>(), response.StatusCode == HttpStatusCode.Unauthorized
+                    ? S.KeyValidRejected
+                    : $"HTTP {(int)response.StatusCode}");
 
             var body = await response.Content.ReadAsStringAsync(cts.Token);
             using var doc = JsonDocument.Parse(body);
-            if (!doc.RootElement.TryGetProperty("data", out var data)) return Array.Empty<string>();
+            if (!doc.RootElement.TryGetProperty("data", out var data)) return (Array.Empty<string>(), S.GroqParse);
 
             var ids = new List<string>();
             foreach (var item in data.EnumerateArray())
                 if (item.TryGetProperty("id", out var idEl) && idEl.GetString() is { } id)
                     ids.Add(id);
-            return ids;
+            return (ids, null);
         }
-        catch
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return Array.Empty<string>();
+            return (Array.Empty<string>(), S.KeyValidTimeout);
+        }
+        catch (Exception ex)
+        {
+            return (Array.Empty<string>(), Net.Describe(ex, ModelsEndpoint));
         }
     }
 
@@ -350,9 +366,9 @@ public static class GroqClient
     public static async Task<ChatModelCheck> CheckChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
     {
         var before = Prefs.ActiveChatModel;
-        var available = await ListModelsAsync(apiKey, cancellationToken);
+        var (available, listError) = await TryListModelsAsync(apiKey, cancellationToken);
         if (available.Count == 0)
-            return new ChatModelCheck(false, null, S.LlmNoModels, false);
+            return new ChatModelCheck(false, null, listError ?? S.LlmNoModels, false);
 
         var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
         if (resolved is null)
@@ -382,7 +398,7 @@ public static class GroqClient
         }
         catch (HttpRequestException ex)
         {
-            return new ChatModelCheck(false, resolved, ex.Message, switched);
+            return new ChatModelCheck(false, resolved, Net.Describe(ex, ChatEndpoint), switched);
         }
     }
 
@@ -428,7 +444,9 @@ public static class GroqClient
         }
         catch (HttpRequestException ex)
         {
-            return new KeyValidation(KeyStatus.Error, ex.Message);
+            // Through the shared translation, not ex.Message: on macOS this exact line was the one
+            // showing a raw error code while dictation named the proxy properly (spec §9.5).
+            return new KeyValidation(KeyStatus.Error, Net.Describe(ex, ModelsEndpoint));
         }
     }
 

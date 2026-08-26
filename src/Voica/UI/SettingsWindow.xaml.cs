@@ -49,6 +49,8 @@ public partial class SettingsWindow : Window
         LanguageCombo.SelectedIndex = Array.IndexOf(GroqClient.Languages, Prefs.Language);
 
         StoreAudioCheck.IsChecked = Prefs.StoreAudio;
+        SystemProxyCheck.IsChecked = Prefs.UseSystemProxy;
+        RefreshProxyRoute();
         NotifyInsertCheck.IsChecked = Prefs.NotifyOnInsert;
         CheckUpdatesCheck.IsChecked = Prefs.CheckUpdatesOnLaunch;
         AboutVersionText.Text = string.Format(S.AboutVersionFmt, AppInfo.Version);
@@ -453,10 +455,53 @@ public partial class SettingsWindow : Window
         Log.Info("Groq key saved");
     }
 
+    // --- Network tab: system proxy (spec §9.5/§11.4) ---
+
+    /// <summary>
+    /// Re-reads the route each time the tab comes up: the Windows proxy settings can change while
+    /// this window stays open.
+    ///
+    /// ⚠️ <c>SelectionChanged</c> bubbles, so every ComboBox on every tab arrives here too — hence
+    /// the check that the TabControl itself is the one that changed.
+    /// </summary>
+    private void OnTabChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || !ReferenceEquals(e.OriginalSource, Tabs)) return;
+        RefreshProxyRoute();
+    }
+
+    private void OnSystemProxyChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.UseSystemProxy = SystemProxyCheck.IsChecked == true;
+        // Net.Shared notices the change by itself and rebuilds; this line has to be told.
+        RefreshProxyRoute();
+        Log.Info($"network: system proxy {(Prefs.UseSystemProxy ? "on" : "off")}");
+    }
+
+    /// <summary>
+    /// Says which way requests actually leave this PC. Deliberately not part of any error message
+    /// (spec §9.5): errors name the proxy's ADDRESS, and where that address came from — Windows,
+    /// this app, or nowhere — belongs here, in one language, next to the switch that changes it.
+    /// </summary>
+    private void RefreshProxyRoute()
+    {
+        // Groq is the busiest of the three destinations (§2, §2.5, §10); Windows can in principle
+        // route them differently, but a PAC that splits them is not worth three lines of UI.
+        var (source, address) = Net.Resolve(GroqClient.Endpoint);
+        ProxyRouteText.Text = source switch
+        {
+            Net.ProxySource.Forced => string.Format(S.ProxyRouteForcedFmt,
+                $"{address!.Host}:{address.Port}", Net.ProxyOverrideVariable),
+            Net.ProxySource.System => string.Format(S.ProxyRouteSystemFmt, $"{address!.Host}:{address.Port}"),
+            _ => Prefs.UseSystemProxy ? S.ProxyRouteDirect : S.ProxyRouteOff,
+        };
+    }
+
     // --- About tab: version, updates, links (spec §10/§12) ---
 
     /// <summary>Index of the About tab, for opening Settings straight at it from the tray menu.</summary>
-    public const int AboutTabIndex = 4;
+    public const int AboutTabIndex = 5;
 
     /// <summary>Selects a tab by index (used by the tray's "About Voica" item).</summary>
     public void SelectTab(int index)

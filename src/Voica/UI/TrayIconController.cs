@@ -153,31 +153,22 @@ public sealed class TrayIconController : IDisposable
         SetState(_controller?.State ?? DictationState.Idle);
     }
 
-    /// <summary>True while the "model is missing" dialog is up — see below.</summary>
-    private bool _modelMissingShown;
+    /// <summary>
+    /// A modal message that actually reaches the person: raised to the front, and never stacked on
+    /// top of an identical one (spec §11.4). Both rules live in <see cref="DialogHost"/>.
+    /// </summary>
+    private static MessageBoxResult? ShowOnce(string message, MessageBoxButton buttons, MessageBoxImage icon)
+        => DialogHost.ShowOnce(message, buttons, icon);
 
     /// <summary>
     /// The local engine is selected without its model (spec §2.5). A balloon is not enough here:
     /// the dictation did not start at all, and the way out is two clicks away, so the message says
     /// what is missing and offers to go there.
-    ///
-    /// ⚠️ Never two of them at once (spec §11.4). In PTT mode every key press starts a dictation,
-    /// so holding the key twice used to stack identical dialogs on top of each other.
     /// </summary>
     private void ShowModelMissing()
     {
-        if (_modelMissingShown) return;
-        _modelMissingShown = true;
-        try
-        {
-            var answer = MessageBox.Show(S.ErrModelMissing, "Voica",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (answer == MessageBoxResult.Yes) OpenSettings(0);   // General: engine + download
-        }
-        finally
-        {
-            _modelMissingShown = false;
-        }
+        if (ShowOnce(S.ErrModelMissing, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            OpenSettings(0);   // General: engine + download
     }
 
     private void ShowError(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Error);
@@ -195,14 +186,24 @@ public sealed class TrayIconController : IDisposable
 
     private void OpenSettings(int? tabIndex = null)
     {
+        bool existed = _settingsWindow is not null;
         if (_settingsWindow is null)
         {
             _settingsWindow = new SettingsWindow(OnSettingsChanged);
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            // ⚠️ The tab is chosen BEFORE the window is shown (spec §11.4). Showing first and
+            // switching after means the window appears on General and visibly jumps to About —
+            // both the tab and the height change in front of the person. This is the same rake
+            // macOS documents for the first show; here it costs one line of ordering.
+            if (tabIndex is { } first) _settingsWindow.SelectTab(first);
             _settingsWindow.Show();
         }
-        if (tabIndex is { } index) _settingsWindow.SelectTab(index);
-        _settingsWindow.Activate();
+        else if (tabIndex is { } later)
+        {
+            _settingsWindow.SelectTab(later);
+        }
+        Raise(_settingsWindow);
+        Log.Info($"settings opened at tab {tabIndex?.ToString() ?? "-"} (already open: {existed})");
     }
 
     private void OpenHistory()
@@ -213,14 +214,35 @@ public sealed class TrayIconController : IDisposable
             _historyWindow.Closed += (_, _) => _historyWindow = null;
             _historyWindow.Show();
         }
-        else
-        {
-            _historyWindow.Activate();
-        }
+        Raise(_historyWindow);
+    }
+
+    /// <summary>
+    /// Brings one of our windows to the front, for real.
+    ///
+    /// ⚠️ <c>Activate()</c> alone is not enough for a tray-only app. Windows refuses to let a
+    /// process that does not own the foreground steal it, and the tray menu closing hands the
+    /// foreground back to whatever the person was working in — so the call quietly turns into a
+    /// blink of the taskbar button, which reads as "the menu item does nothing". A minimized
+    /// window has to be restored first, and the brief Topmost bounce is what actually raises it.
+    /// </summary>
+    private static void Raise(Window window)
+    {
+        if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+        window.Show();
+        bool wasTopmost = window.Topmost;
+        window.Topmost = true;
+        window.Activate();
+        window.Topmost = wasTopmost;
+        window.Focus();
     }
 
     /// <summary>About lives as a Settings tab now (parity with macOS) — open Settings there.</summary>
-    private void OpenAbout() => OpenSettings(SettingsWindow.AboutTabIndex);
+    private void OpenAbout()
+    {
+        Log.Info("tray: About");
+        OpenSettings(SettingsWindow.AboutTabIndex);
+    }
 
     // --- Updates (spec §10) ---
 
@@ -240,11 +262,19 @@ public sealed class TrayIconController : IDisposable
         await RunUpdateCheckAsync(manual: true);
     }
 
+    /// <summary>
+    /// One update check (spec §10). A background check is SILENT whatever happens — it goes to the
+    /// log and nowhere else; only a check the user asked for is allowed to put a window on screen.
+    /// Behind a proxy that refuses (§9.5) the background check fails at every launch, and a chatty
+    /// one would turn that into a stream of windows nobody can act on.
+    /// </summary>
     private async Task RunUpdateCheckAsync(bool manual)
     {
+        // Before the request, not after (spec §10): the slot belongs to the attempt, not to its
+        // outcome. See Updater.TakeDailySlot.
+        Updater.TakeDailySlot();
         var result = await Updater.CheckAsync();
-        Prefs.LastUpdateCheck = DateTime.UtcNow;   // cache the check moment (throttle, spec §10)
-        Log.Info($"update check: {result.Outcome} {result.Version ?? ""} {result.Message ?? ""}".TrimEnd());
+        Log.Info($"update check ({(manual ? "manual" : "launch")}): {result.Outcome} {result.Version ?? ""} {result.Message ?? ""}".TrimEnd());
 
         switch (result.Outcome)
         {
@@ -252,30 +282,26 @@ public sealed class TrayIconController : IDisposable
                 _updateUrl = result.Url;
                 if (_updateMenuItem is not null)
                     _updateMenuItem.Header = string.Format(S.MenuDownloadUpdateFmt, result.Version);
-                if (manual && result.Url is not null)
-                {
-                    var open = MessageBox.Show(
-                        string.Format(S.UpdateAvailableAskFmt, result.Version),
-                        "Voica", MessageBoxButton.YesNo, MessageBoxImage.Information);
-                    if (open == MessageBoxResult.Yes) OpenUrl(result.Url);
-                }
+                if (manual && result.Url is not null
+                    && ShowOnce(string.Format(S.UpdateAvailableAskFmt, result.Version),
+                        MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                    OpenUrl(result.Url);
                 break;
 
             case UpdateOutcome.UpToDate:
                 if (manual)
-                    MessageBox.Show(string.Format(S.UpdateUpToDateFmt, AppInfo.Version), "Voica",
+                    ShowOnce(string.Format(S.UpdateUpToDateFmt, AppInfo.Version),
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 break;
 
             case UpdateOutcome.NoRelease:
                 if (manual)
-                    MessageBox.Show(S.UpdateNoReleases, "Voica",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowOnce(S.UpdateNoReleases, MessageBoxButton.OK, MessageBoxImage.Information);
                 break;
 
             case UpdateOutcome.Error:
                 if (manual)
-                    MessageBox.Show(string.Format(S.UpdateErrorFmt, result.Message), "Voica",
+                    ShowOnce(string.Format(S.UpdateErrorFmt, result.Message),
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 break;
         }

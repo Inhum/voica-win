@@ -51,12 +51,41 @@ public static class Net
     }
 
     /// <summary>Where the proxy for <paramref name="target"/> comes from, or null when going direct.</summary>
-    public static Uri? ProxyFor(Uri target)
+    public static Uri? ProxyFor(Uri target) => Resolve(target).Address;
+
+    /// <summary>Who decided the route: nobody, the system, or <see cref="ProxyOverrideVariable"/>.</summary>
+    public enum ProxySource
     {
-        if (Override() is { } forced) return forced;
-        if (!Prefs.UseSystemProxy) return null;
-        try { return WebRequest.DefaultWebProxy?.GetProxy(target); }
-        catch { return null; }
+        /// <summary>Nothing stands in the way — the request goes straight out.</summary>
+        Direct,
+        /// <summary>The proxy Windows itself hands out for this address.</summary>
+        System,
+        /// <summary>The proxy this process was told to use, overriding the system (§9.5 test path).</summary>
+        Forced,
+    }
+
+    /// <summary>
+    /// The route for <paramref name="target"/>: where the proxy came from, and which one.
+    ///
+    /// Kept apart from <see cref="Describe"/> on purpose (spec §9.5): the error message carries the
+    /// ADDRESS only, and the explanation of where that address came from is a line of its own on the
+    /// Network tab. Mixing them is how macOS ended up with half a sentence in the wrong language.
+    /// </summary>
+    public static (ProxySource Source, Uri? Address) Resolve(Uri target)
+    {
+        if (Override() is { } forced) return (ProxySource.Forced, forced);
+        if (!Prefs.UseSystemProxy) return (ProxySource.Direct, null);
+        try
+        {
+            var proxy = WebRequest.DefaultWebProxy?.GetProxy(target);
+            // A proxy that is the target itself means "go direct" — the older IWebProxy contract
+            // answers that way instead of null, and taking it at face value would report a proxy
+            // where there is none. The stub caught exactly the mirror image of this on macOS.
+            if (proxy is null || (proxy.Host == target.Host && proxy.Port == target.Port))
+                return (ProxySource.Direct, null);
+            return (ProxySource.System, proxy);
+        }
+        catch { return (ProxySource.Direct, null); }
     }
 
     /// <summary>

@@ -320,7 +320,9 @@ public sealed class DictationController : IDisposable
         {
             Log.Error("transcription failed", ex);
             TryDelete(recording.FilePath);
-            RaiseError(ex.Message);
+            // Whatever slipped past GroqClient's own handling still goes through the one
+            // translation point (spec §9.5); anything that is not a network failure keeps its text.
+            RaiseError(Net.Describe(ex, GroqClient.Endpoint));
         }
         finally
         {

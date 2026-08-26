@@ -58,11 +58,18 @@ public static class S
         + "\n\nOpen Settings?",
         "Выбран локальный движок, но его модель не установлена. Скачайте локальную модель GigaAM — или переключите распознавание обратно на облако."
         + "\n\nОткрыть настройки?");
+    // A model that arrived by hand can be truncated or from the wrong release; the checksums are
+    // published in the README next to the manual-install instructions.
+    public static string ErrModelCorrupt => Loc.T(
+        "The local model files do not match their checksums. Delete the model in Settings → Data and install it again.",
+        "Файлы локальной модели не совпадают с контрольными суммами. Удалите модель в Настройках → «Данные» и установите её заново.");
+
     // Network / proxy (spec §9.5). The address is the only thing interpolated: where it came from
     // is a separate line on the Network tab, so the message never mixes two languages.
     public static string ErrProxyAuthFmt => Loc.T(
         "Could not get through the proxy {0} — it wants credentials, or it is not answering.",
         "Не удалось пройти через прокси {0} — он требует авторизации либо не отвечает.");
+    public static string NetTimeout => Loc.T("The request timed out.", "Запрос не ответил вовремя.");
     public static string ErrNoKey => Loc.T("No Groq API key set. Add it in Settings.", "Ключ Groq не задан. Укажите его в Настройках.");
     public static string ErrRecordingStartFmt => Loc.T("Couldn't start recording: {0}", "Не удалось начать запись: {0}");
     public static string ErrRecordingFailedFmt => Loc.T("Recording failed: {0}", "Ошибка записи: {0}");
@@ -118,7 +125,28 @@ public static class S
     public static string TabDictation => Loc.T("Dictation", "Диктовка");
     public static string TabVocabulary => Loc.T("Vocabulary", "Словарь");
     public static string TabData => Loc.T("Data", "Данные");
+    public static string TabNetwork => Loc.T("Network", "Сеть");
     public static string TabAbout => Loc.T("About", "О программе");
+
+    // Network tab (spec §9.5/§11.4). The route line is deliberately separate from the error
+    // message: the error names the ADDRESS, this line explains where that address came from.
+    public static string LblProxy => Loc.T("Proxy", "Прокси");
+    public static string ChkUseSystemProxy => Loc.T("Use the system proxy", "Использовать системный прокси");
+    public static string ProxyHint => Loc.T(
+        "On by default. Voica authenticates with your Windows sign-in, so a corporate proxy asking for credentials is answered without any password being typed or stored here. Turn it off to ignore the system settings and go straight out: a proxy left misconfigured in Windows blocks the app just as effectively as a missing one. The setting covers every request Voica makes — recognition, the model download and update checks.",
+        "По умолчанию включено. Voica авторизуется учётными данными вашего входа в Windows, поэтому корпоративный прокси, требующий авторизации, получает ответ — пароль здесь не вводится и не хранится. Выключите, чтобы игнорировать системные настройки и ходить напрямую: криво прописанный в Windows прокси блокирует приложение не хуже отсутствующего. Настройка действует на все обращения Voica — распознавание, скачивание модели и проверку обновлений.");
+    public static string ProxyRouteSystemFmt => Loc.T(
+        "Requests go through the system proxy {0}.",
+        "Запросы идут через системный прокси {0}.");
+    public static string ProxyRouteForcedFmt => Loc.T(
+        "Requests go through the proxy {0}, set for this run by {1}.",
+        "Запросы идут через прокси {0}, заданный для этого запуска переменной {1}.");
+    public static string ProxyRouteDirect => Loc.T(
+        "Requests go straight out — Windows offers no proxy for these addresses.",
+        "Запросы идут напрямую — Windows не предлагает прокси для этих адресов.");
+    public static string ProxyRouteOff => Loc.T(
+        "Requests go straight out — the system proxy is turned off here.",
+        "Запросы идут напрямую — системный прокси здесь выключен.");
     public static string LblUpdates => Loc.T("Updates", "Обновления");
     public static string BtnCheckNow => Loc.T("Check now", "Проверить сейчас");
     public static string BtnDownloadUpdateFmt => Loc.T("Download {0}", "Скачать {0}");
