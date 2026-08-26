@@ -4,6 +4,53 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-08-26
+
+### Added
+- **Working through a proxy, and a Network tab** (spec §9.5, §11.4). The app has to work where the only
+  way out is a corporate proxy and a VPN is forbidden. Routing was never the problem — .NET reads
+  the system settings by itself — **authentication** was: the proxy answers `407`, nobody sends
+  credentials, and from the outside it looks like "the app cannot do proxies". Voica now
+  authenticates as the signed-in Windows user (domain SSO; no password is typed into the app or
+  stored by it), and every request — recognition, the model download, update checks — goes through
+  one shared client, so the setting reaches all of them. A sixth tab, **Network**, holds the
+  "Use the system proxy" switch (on by default; off = ignore Windows and go straight out, because a
+  proxy left misconfigured blocks the app just as effectively as a missing one) plus a line saying
+  which route requests actually take.
+- **A proxy failure says so, and names the proxy**, in one place for all four surfaces. The address
+  is what an administrator needs; without it the report is "the internet does not work".
+- **`scripts/fake-proxy.ps1`** and the `--probe-net` flag: proxy behaviour is checked against a stub
+  (407 mode and a real tunnelling mode), because none of these defects are visible to unit tests.
+  It immediately caught two: key validation and the chat-model check were showing raw error text,
+  and a `407` while listing models read as "your Groq org has no chat models".
+- **Manual model installation** is documented in both READMEs — file names, sizes and SHA-256 — for
+  networks that will not pass 215 MB. Voica verifies a model it did not download itself at first
+  use and remembers the result (2.8 s once, then 22 ms), so a truncated copy is reported as such
+  instead of turning into gibberish recognition.
+- **Release candidates** (spec §13): `vX.Y.Z-rc.N` is published as a pre-release, which GitHub keeps
+  out of `/releases/latest` — so a candidate never reaches ordinary users, while About shows the
+  full version with its suffix and version comparison treats a release as newer than its own
+  candidate.
+
+### Fixed
+- **A chosen local engine is never served by the cloud** (spec §2.5). The refusal now comes at the
+  start of the dictation, with a dialog offering Settings, instead of the audio quietly going to
+  Groq while the switch reads "offline".
+- **Choosing the local engine no longer starts a download by itself.** Behind a proxy that wants
+  credentials that was an instant `407` nobody asked for.
+- **Dialogs from the tray reach the person.** With no main window to own them, Windows would not
+  give them the foreground: they landed behind the active window and only blinked in the taskbar.
+  The same applied to Settings and History opened from the tray menu.
+- **Settings opens directly on the tab it was asked for** (spec §11.4): "About" used to show
+  General for a moment and then jump, size and all.
+- **Identical warnings no longer stack** — previously only the "model is missing" dialog was
+  guarded, and it is not the only one reachable twice in a row.
+- **A long status line cannot resize or overflow the Settings window**: status texts are capped and
+  wrap, which a proxy error message made obvious.
+- **A failed background update check takes the daily slot** (spec §10) and stays silent. In a closed
+  network the check fails at every launch; the slot is now taken before the request, so it is not
+  retried — and only a check the user asked for is allowed to show anything.
+
 ## [0.8.1] - 2026-08-21
 
 ### Fixed
