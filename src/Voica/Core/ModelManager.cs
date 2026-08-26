@@ -34,17 +34,15 @@ public static class ModelManager
     public static string OnnxPath => PathFor(Files[0].FileName);
     public static string VocabPath => PathFor(Files[2].FileName);
 
+    /// <summary>Where the files come from — also what a proxy failure has to be reported against.</summary>
+    public static Uri ReleaseUri => new(DownloadUrl(Files[0].FileName));
+
     private static string DownloadUrl(string fileName) =>
         $"https://github.com/{AppInfo.RepoOwner}/{AppInfo.RepoName}/releases/download/{ReleaseTag}/{fileName}";
 
-    private static readonly HttpClient Http = CreateClient();
-
-    private static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Voica");
-        return http;
-    }
+    // The shared client, so the proxy setting applies here too (spec §9.5) — a corporate proxy
+    // wanting credentials is the most common reason the local engine "cannot be installed".
+    private static HttpClient Http => Net.Shared;
 
     /// <summary>True when every model file is present with the right size.</summary>
     public static bool IsInstalled()

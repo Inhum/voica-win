@@ -27,15 +27,9 @@ public static class Updater
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan LaunchThrottle = TimeSpan.FromDays(1);
 
-    private static readonly HttpClient Http = CreateClient();
-
-    private static HttpClient CreateClient()
-    {
-        var http = new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Voica");   // spec §10
-        http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        return http;
-    }
+    // The shared client (spec §9.5). The Accept header rides on the request rather than the client,
+    // because the client is shared with recognition and the model download.
+    private static HttpClient Http => Net.Shared;
 
     /// <summary>Normalizes a release tag: trims and drops a leading "v" (spec §10).</summary>
     public static string Normalize(string tag)
@@ -79,7 +73,9 @@ public static class Updater
 
         try
         {
-            using var response = await Http.GetAsync(LatestReleaseEndpoint, cts.Token);
+            using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseEndpoint);
+            request.Headers.Accept.ParseAdd("application/vnd.github+json");   // spec §10
+            using var response = await Http.SendAsync(request, cts.Token);
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return new UpdateCheckResult(UpdateOutcome.NoRelease);
             if (!response.IsSuccessStatusCode)
@@ -104,7 +100,9 @@ public static class Updater
         }
         catch (Exception ex)
         {
-            return new UpdateCheckResult(UpdateOutcome.Error, Message: ex.Message);
+            // Through the shared translation (spec §9.5): behind a proxy this is the difference
+            // between "прокси требует авторизации" and an opaque socket error.
+            return new UpdateCheckResult(UpdateOutcome.Error, Message: Net.Describe(ex, LatestReleaseEndpoint));
         }
     }
 }

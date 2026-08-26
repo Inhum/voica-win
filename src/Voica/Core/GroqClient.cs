@@ -62,7 +62,9 @@ public static class GroqClient
     private static readonly TimeSpan ChatProbeTimeout = TimeSpan.FromSeconds(15);
 
     // Shared client with no built-in timeout; each call applies its own via a CancellationToken.
-    private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
+    // One client for every network call in the app (spec §9.5): a proxy setting that reaches
+    // recognition but not the model download would be worse than none.
+    private static HttpClient Http => Net.Shared;
 
     /// <summary>
     /// Prepares the Whisper <c>prompt</c> field from the vocabulary string (spec §6):
@@ -125,7 +127,11 @@ public static class GroqClient
         }
         catch (HttpRequestException ex)
         {
-            throw new GroqException(string.Format(S.GroqNetworkFmt, ex.Message), isNetworkError: true);
+            // One translation point (spec §9.5): a proxy failure must read the same here as it does
+            // in the model download and the update check.
+            throw new GroqException(Net.IsProxyAuthFailure(ex)
+                ? Net.Describe(ex, Endpoint)
+                : string.Format(S.GroqNetworkFmt, ex.Message), isNetworkError: true);
         }
 
         var body = await response.Content.ReadAsStringAsync(cts.Token);

@@ -48,6 +48,11 @@ public static class Prefs
         public bool RemoveFillers { get; set; } = true;           // spec §6.3, on by default
         public bool FixQuotes { get; set; } = true;               // spec §6.4, on by default
         public bool FixTermsByRules { get; set; } = true;         // spec §6.2, on by default
+
+        // Spec §9.5: the app must work where the only way out is a proxy. Routing already works —
+        // .NET reads the system settings itself — so this switch exists for the opposite case: a
+        // proxy left misconfigured in the system blocks the app, and turning it off goes direct.
+        public bool UseSystemProxy { get; set; } = true;          // spec §9.5, on by default
     }
 
     private static Data Load()
@@ -194,6 +199,13 @@ public static class Prefs
     {
         get { lock (Gate) return _data.FixTermsByRules; }
         set { lock (Gate) { _data.FixTermsByRules = value; Save(); } }
+    }
+
+    /// <summary>Whether requests go through the system proxy (spec §9.5, on by default).</summary>
+    public static bool UseSystemProxy
+    {
+        get { lock (Gate) return _data.UseSystemProxy; }
+        set { lock (Gate) { _data.UseSystemProxy = value; Save(); } }
     }
 
     /// <summary>

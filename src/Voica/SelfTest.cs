@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Net.Http;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -106,6 +107,36 @@ public static class SelfTest
             && !LayoutSwitch.CollidesWithLayoutSwitch(HotkeyBinding.Default)
             && !LayoutSwitch.CollidesWithLayoutSwitch(
                 new HotkeyBinding { Ctrl = true, Shift = true, MainVk = HotkeyBinding.VK_SPACE }));
+
+        // --- Network / proxy (spec §9.5) ---
+        // The override exists so proxy behaviour can be exercised without a corporate network.
+        Check("proxy override parses host:port, with or without a scheme",
+            Net.ParseOverride("127.0.0.1:8888")?.Port == 8888
+            && Net.ParseOverride("http://proxy.corp:3128")?.Host == "proxy.corp"
+            && Net.ParseOverride(" 10.0.0.1:80 ")?.Host == "10.0.0.1");
+        Check("proxy override ignores what it cannot use",
+            Net.ParseOverride(null) is null && Net.ParseOverride("") is null
+            && Net.ParseOverride("   ") is null && Net.ParseOverride("nonsense") is null);
+        // .NET 8 names a tunnelled proxy failure outright; a plain 407 covers the rest. Both have
+        // to be recognised through the exception chain, because callers see them wrapped.
+        Check("a proxy failure is told apart from an ordinary network error",
+            Net.IsProxyAuthFailure(new HttpRequestException("tunnel", null, System.Net.HttpStatusCode.ProxyAuthenticationRequired))
+            && Net.IsProxyAuthFailure(new InvalidOperationException("outer",
+                new HttpRequestException("inner", null, System.Net.HttpStatusCode.ProxyAuthenticationRequired)))
+            && !Net.IsProxyAuthFailure(new HttpRequestException("plain network"))
+            && !Net.IsProxyAuthFailure(new TimeoutException()));
+        // One translation point: a proxy failure names the proxy, everything else keeps its own
+        // message. macOS shipped the opposite — the proxy named in one place out of four.
+        var proxyText = Net.Describe(
+            new HttpRequestException("x", null, System.Net.HttpStatusCode.ProxyAuthenticationRequired),
+            new Uri("https://api.groq.com/openai/v1/audio/transcriptions"));
+        Check("proxy failures are translated, others pass through",
+            proxyText != "x" && proxyText.Length > 0
+            && Net.Describe(new TimeoutException("timed out"), new Uri("https://example.com")) == "timed out");
+        var proxySnapshot = Prefs.UseSystemProxy;
+        Prefs.UseSystemProxy = false;
+        Check("the proxy switch persists", !Prefs.UseSystemProxy);
+        Prefs.UseSystemProxy = proxySnapshot;
 
         // --- Local engine without its model (spec §2.5) ---
         // The cloud must never stand in for a chosen local engine, not even "while the model
@@ -667,7 +698,9 @@ public static class SelfTest
             && Prefs.SttModel == GroqClient.DefaultSttModel && Prefs.Language == "auto"
             && Prefs.DoubleTapToStart && Prefs.ShowOverlay
             // Rules that change words are ON by default (spec §6.2/§6.3/§6.4).
-            && Prefs.RemoveFillers && Prefs.FixQuotes && Prefs.FixTermsByRules);
+            && Prefs.RemoveFillers && Prefs.FixQuotes && Prefs.FixTermsByRules
+            // The system proxy is used by default (spec §9.5) — that is what .NET does anyway.
+            && Prefs.UseSystemProxy);
         Prefs.Mode = snapMode; Prefs.Hotkey = snapHotkey; Prefs.Output = snapOut;
         Prefs.RetentionDays = snapDays; Prefs.StoreAudio = snapStore;
         Prefs.Vocabulary = snapVocab2; Prefs.CheckUpdatesOnLaunch = snapCheck;

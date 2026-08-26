@@ -130,7 +130,9 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             Log.Error("model download failed", ex);
-            MessageBox.Show(string.Format(S.ModelDownloadFailedFmt, ex.Message), "Voica",
+            // Through the shared translation (spec §9.5): behind a corporate proxy this is the most
+            // common failure of all, and "407" tells the user nothing.
+            MessageBox.Show(string.Format(S.ModelDownloadFailedFmt, Net.Describe(ex, ModelManager.ReleaseUri)), "Voica",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally

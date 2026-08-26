@@ -58,6 +58,11 @@ public static class S
         + "\n\nOpen Settings?",
         "Выбран локальный движок, но его модель не установлена. Скачайте локальную модель GigaAM — или переключите распознавание обратно на облако."
         + "\n\nОткрыть настройки?");
+    // Network / proxy (spec §9.5). The address is the only thing interpolated: where it came from
+    // is a separate line on the Network tab, so the message never mixes two languages.
+    public static string ErrProxyAuthFmt => Loc.T(
+        "Could not get through the proxy {0} — it wants credentials, or it is not answering.",
+        "Не удалось пройти через прокси {0} — он требует авторизации либо не отвечает.");
     public static string ErrNoKey => Loc.T("No Groq API key set. Add it in Settings.", "Ключ Groq не задан. Укажите его в Настройках.");
     public static string ErrRecordingStartFmt => Loc.T("Couldn't start recording: {0}", "Не удалось начать запись: {0}");
     public static string ErrRecordingFailedFmt => Loc.T("Recording failed: {0}", "Ошибка записи: {0}");
