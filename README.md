@@ -80,6 +80,10 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   - **Quotation marks are repaired** — straight quotes become guillemets by position, a missing
     space after a colon comes back, and unpaired quotes are removed. Recognition places quotes
     however it happens to, and the AI pass adds its own; English text is left alone.
+- **Works behind a corporate proxy** — Voica uses the proxy Windows is configured with and
+  authenticates as the signed‑in user (domain SSO), so no password is typed into the app or stored
+  by it. The switch is on the **Network** tab, next to a line saying which route requests actually
+  take; turning it off goes straight out. If a proxy refuses, the message names its address.
 - **Update checks** against this repo's GitHub releases (opt‑in, once a day). Voica never downloads
   or installs anything itself — it just opens the release page.
 - **Privacy** — no backend, no telemetry. Network is used only for Groq (cloud transcription /
@@ -89,7 +93,7 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 
 ## Screenshots
 
-**Settings** — five tabs: engine and API key, dictation, vocabulary, data, about.
+**Settings** — six tabs: engine and API key, dictation, vocabulary, data, network, about.
 
 ![Settings — General](docs/settings-general.png)
 
@@ -98,6 +102,8 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
 ![Settings — Vocabulary](docs/settings-vocabulary.png)
 
 ![Settings — Data](docs/settings-data.png)
+
+![Settings — Network](docs/settings-network.png)
 
 ![Settings — About](docs/settings-about.png)
 
@@ -200,6 +206,7 @@ reflects state instead: idle (blue), recording (pulsing red), transcribing (ambe
 | Fix terms with AI | Optional Groq pass on top of the rules; off by default |
 | Use the system proxy | On by default (Network tab); off = ignore Windows and go direct |
 | Groq API key | Validate + Save (DPAPI); **Show** to reveal |
+| Delete the local model… | Frees 214 MB, asks first; the cloud keeps working, and it can be downloaded again |
 | Delete all data… | Wipes history, audio, key, settings (random‑phrase confirmation) |
 
 ## Data locations
@@ -220,7 +227,8 @@ on your PC with Sber's **GigaAM v3** (MIT) — Russian speech with punctuation a
 normalization, **no network and no API key**. The model (~215 MB, int8 ONNX) downloads once from
 this repo's [model release](https://github.com/Inhum/voica-win/releases/tag/model-gigaam-v3-e2e-ctc-int8-1)
 with SHA‑256 verification, lives in `%APPDATA%\Voica\models\`, and can be deleted in
-Settings → Data. Notes:
+Settings → Data (it asks first). The download can be **cancelled** while it runs, and nothing
+half‑downloaded is left behind. Notes:
 
 - The vocabulary hint (§ Whisper `prompt`) works only with the cloud engine; **AI term
   correction works with both** (it needs a key and network).

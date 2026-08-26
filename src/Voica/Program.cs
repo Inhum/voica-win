@@ -146,39 +146,53 @@ public static class Program
         return 0;
     }
 
-    /// <summary>Shows the Settings window on its own so its tabs can be measured and shot.</summary>
+    /// <summary>
+    /// Shows the Settings window on its own so its tabs can be measured and shot.
+    ///
+    /// ⚠️ The window is built inside <c>Startup</c>, not before <c>Run()</c>. Only once the
+    /// dispatcher is running does the thread have WPF's synchronization context — and without it
+    /// the async work the window starts in its constructor never comes back to the UI thread, so
+    /// the chat-model check sits at "Checking model availability…" for ever and the shot is of a
+    /// window that never finished loading. The probe has to behave like the app, or it measures
+    /// itself.
+    /// </summary>
     private static int ProbeSettings(string what)
     {
         var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
-        var window = new UI.SettingsWindow(() => { });
 
-        if (int.TryParse(what, out var only))
+        app.Startup += (_, _) =>
         {
-            // The tray's order: the tab is chosen before the window is shown (spec §11.4).
-            window.SelectTab(only);
-            window.Show();
-            Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} on first show");
-            var hold = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-            hold.Tick += (_, _) =>
+            var window = new UI.SettingsWindow(() => { });
+
+            if (int.TryParse(what, out var only))
             {
-                Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} after settling");
-                app.Shutdown();
-            };
-            hold.Start();
-        }
-        else
-        {
-            window.Show();
-            int i = 0;
-            var cycle = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
-            cycle.Tick += (_, _) =>
+                // The tray's order: the tab is chosen before the window is shown (spec §11.4).
+                window.SelectTab(only);
+                window.Show();
+                Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} on first show");
+                var hold = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+                hold.Tick += (_, _) =>
+                {
+                    Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} after settling");
+                    app.Shutdown();
+                };
+                hold.Start();
+            }
+            else
             {
-                if (i > 0) Console.WriteLine($"tab {i - 1}: {window.ActualWidth:F0}x{window.ActualHeight:F0}");
-                if (i >= 6) { app.Shutdown(); return; }
-                window.SelectTab(i++);
-            };
-            cycle.Start();
-        }
+                window.Show();
+                int i = 0;
+                var cycle = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+                cycle.Tick += (_, _) =>
+                {
+                    if (i > 0) Console.WriteLine($"tab {i - 1}: {window.ActualWidth:F0}x{window.ActualHeight:F0}");
+                    if (i >= 6) { app.Shutdown(); return; }
+                    window.SelectTab(i++);
+                };
+                cycle.Start();
+            }
+        };
+
         return app.Run();
     }
 
