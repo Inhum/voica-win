@@ -84,6 +84,10 @@ public partial class SettingsWindow : Window
         if (!_loaded) return;
         Prefs.Engine = EngineCombo.SelectedIndex == 1 ? EngineKind.Local : EngineKind.Cloud;
 
+        // Switching back to the cloud mid-download means the model is not wanted after all — no
+        // reason to keep spending someone's traffic on it (macOS parity).
+        if (Prefs.Engine == EngineKind.Cloud) CancelModelDownload();
+
         // Choosing the local engine must NOT start a download by itself (spec §9.5): behind a
         // proxy that wants credentials it is an instant 407 nobody asked for and nobody understands.
         // The Download button appears right here instead, and the download starts when it is
@@ -104,6 +108,7 @@ public partial class SettingsWindow : Window
                 : string.Format(S.ModelNotDownloadedFmt, mb);
 
         DownloadModelButton.Visibility = !installed && !downloading ? Visibility.Visible : Visibility.Collapsed;
+        CancelDownloadButton.Visibility = downloading ? Visibility.Visible : Visibility.Collapsed;
         ModelProgress.Visibility = downloading ? Visibility.Visible : Visibility.Collapsed;
 
         // Data tab: on-disk footprint + delete.
@@ -114,6 +119,16 @@ public partial class SettingsWindow : Window
     private void OnDownloadModel(object sender, RoutedEventArgs e)
     {
         if (_downloadCts is null) _ = DownloadModelAsync();
+    }
+
+    /// <summary>Stops a download in progress (macOS parity): 215 MB is worth changing your mind about.</summary>
+    private void OnCancelModelDownload(object sender, RoutedEventArgs e) => CancelModelDownload();
+
+    private void CancelModelDownload()
+    {
+        if (_downloadCts is null) return;
+        Log.Info("model download cancelled by the user");
+        _downloadCts.Cancel();
     }
 
     private async System.Threading.Tasks.Task DownloadModelAsync()
@@ -128,6 +143,12 @@ public partial class SettingsWindow : Window
                 ModelStatusText.Text = string.Format(S.ModelDownloadingFmt, (int)(p * 100));
             });
             await ModelManager.DownloadAsync(progress, _downloadCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Asked for, not gone wrong: the status line goes back to "not downloaded" by itself
+            // and nothing else has to be said. A dialog here would be the app arguing with a
+            // button it offered.
         }
         catch (Exception ex)
         {
@@ -147,7 +168,15 @@ public partial class SettingsWindow : Window
 
     private void OnDeleteModel(object sender, RoutedEventArgs e)
     {
+        // Ask first. It is one click, and the way back is a 214 MB download — which in the networks
+        // this was built for (§9.5) is exactly what people cannot easily repeat. macOS asks too.
+        long mb = ModelManager.TotalSize / (1024 * 1024);
+        var confirm = MessageBox.Show(this, string.Format(S.ModelDeleteAskFmt, mb), S.ModelDeleteTitle,
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
         ModelManager.Delete();
+        Log.Info("local model deleted from Settings");
         RefreshModelStatus();
     }
 
@@ -588,8 +617,11 @@ public partial class SettingsWindow : Window
         Prefs.Reset();
         _onHotkeyChanged();       // re-apply default hotkey/mode
         LoadFromPrefs();
-        KeyStatusText.Text = S.AllDeleted;
-        Log.Info("all data deleted and settings reset");
+        // ⚠️ Say so when a key survives this. The file is gone, but the §9 environment fallback can
+        // still hand one over, and LoadFromPrefs fills the field back in from it — "all data
+        // deleted" next to a filled key field looks like the deletion quietly failed.
+        KeyStatusText.Text = KeyStore.HasKey ? $"{S.AllDeleted} {S.AllDeletedEnvKey}" : S.AllDeleted;
+        Log.Info($"all data deleted and settings reset (env key still present: {KeyStore.HasKey})");
     }
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();

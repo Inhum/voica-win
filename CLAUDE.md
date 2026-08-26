@@ -69,6 +69,12 @@ the update check, the model download — and prints what each would tell the use
 five must NAME the proxy; anything that prints a raw error code is the §9.5 defect coming back.
 It sends real requests with the saved key.
 
+**`--probe-settings [all|<tab>]`** shows the Settings window on its own and prints its size: `all`
+cycles the tabs, a number opens straight at one the way the tray does. §11.4's sizing rules — the
+window grows *and* shrinks per tab, and a window opened at a tab is sized for that tab on the first
+frame — are invisible in the XAML and only provable by reading the height back. Pair it with
+`PrintWindow` from PowerShell to shoot a tab (see the window-screenshot notes).
+
 **Rebuild gotcha:** a running `Voica.exe` locks the output exe. Stop it first:
 `Get-Process Voica -ErrorAction SilentlyContinue | Stop-Process -Force`.
 

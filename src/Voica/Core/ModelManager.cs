@@ -91,9 +91,10 @@ public static class ModelManager
             }
 
             var partPath = finalPath + ".part";
-            using (var response = await Http.GetAsync(DownloadUrl(file.FileName),
-                       HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+            try
             {
+                using var response = await Http.GetAsync(DownloadUrl(file.FileName),
+                    HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 response.EnsureSuccessStatusCode();
                 await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
                 await using var target = File.Create(partPath);
@@ -106,6 +107,15 @@ public static class ModelManager
                     written += read;
                     progress?.Report((doneBase + (double)written) / total);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Changed their mind part-way. There is no resume yet (§9.5 keeps it as a separate
+                // item), so what is on disk is worth nothing — and leaving 200 MB of it in the data
+                // folder, invisible in the UI, is not a kindness. The stream is closed by the time
+                // we get here, so the file can go.
+                TryDelete(partPath);
+                throw;
             }
 
             var sha = await ComputeSha256Async(partPath, cancellationToken);

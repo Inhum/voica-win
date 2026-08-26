@@ -44,6 +44,18 @@ public static class Program
             return ProbeNet().GetAwaiter().GetResult();
         }
 
+        // Settings-window diagnostic (spec §11.4, kept documented per §12): the tab sizing rules —
+        // the window grows AND shrinks, and a window opened straight at a tab is sized for THAT
+        // tab — cannot be checked by reading XAML. Reading the height back is the check.
+        //   --probe-settings all   cycle every tab, printing the window size
+        //   --probe-settings <n>   open straight at tab n, the way the tray does, and hold it
+        int probeArg = Array.FindIndex(args, a => a.Equals("--probe-settings", StringComparison.OrdinalIgnoreCase));
+        if (probeArg >= 0)
+        {
+            AttachConsole(AttachParentProcess);
+            return ProbeSettings(probeArg + 1 < args.Length ? args[probeArg + 1] : "all");
+        }
+
         var app = new App();
         app.InitializeComponent();
         return app.Run();
@@ -132,6 +144,42 @@ public static class Program
             Console.WriteLine($"model download: {Net.Describe(ex, ModelManager.ReleaseUri)}");
         }
         return 0;
+    }
+
+    /// <summary>Shows the Settings window on its own so its tabs can be measured and shot.</summary>
+    private static int ProbeSettings(string what)
+    {
+        var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+        var window = new UI.SettingsWindow(() => { });
+
+        if (int.TryParse(what, out var only))
+        {
+            // The tray's order: the tab is chosen before the window is shown (spec §11.4).
+            window.SelectTab(only);
+            window.Show();
+            Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} on first show");
+            var hold = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            hold.Tick += (_, _) =>
+            {
+                Console.WriteLine($"tab {only}: {window.ActualWidth:F0}x{window.ActualHeight:F0} after settling");
+                app.Shutdown();
+            };
+            hold.Start();
+        }
+        else
+        {
+            window.Show();
+            int i = 0;
+            var cycle = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+            cycle.Tick += (_, _) =>
+            {
+                if (i > 0) Console.WriteLine($"tab {i - 1}: {window.ActualWidth:F0}x{window.ActualHeight:F0}");
+                if (i >= 6) { app.Shutdown(); return; }
+                window.SelectTab(i++);
+            };
+            cycle.Start();
+        }
+        return app.Run();
     }
 
     /// <summary>A second of silence as a WAV file, so the probe can post a real request.</summary>
