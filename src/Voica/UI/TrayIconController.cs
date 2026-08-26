@@ -57,6 +57,7 @@ public sealed class TrayIconController : IDisposable
         _controller.Error += ShowError;
         _controller.Notice += ShowNotice;
         _controller.ResultReady += ShowResultWindow;
+        _controller.ModelMissing += ShowModelMissing;
 
         try
         {
@@ -152,7 +153,35 @@ public sealed class TrayIconController : IDisposable
         SetState(_controller?.State ?? DictationState.Idle);
     }
 
+    /// <summary>True while the "model is missing" dialog is up — see below.</summary>
+    private bool _modelMissingShown;
+
+    /// <summary>
+    /// The local engine is selected without its model (spec §2.5). A balloon is not enough here:
+    /// the dictation did not start at all, and the way out is two clicks away, so the message says
+    /// what is missing and offers to go there.
+    ///
+    /// ⚠️ Never two of them at once (spec §11.4). In PTT mode every key press starts a dictation,
+    /// so holding the key twice used to stack identical dialogs on top of each other.
+    /// </summary>
+    private void ShowModelMissing()
+    {
+        if (_modelMissingShown) return;
+        _modelMissingShown = true;
+        try
+        {
+            var answer = MessageBox.Show(S.ErrModelMissing, "Voica",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer == MessageBoxResult.Yes) OpenSettings(0);   // General: engine + download
+        }
+        finally
+        {
+            _modelMissingShown = false;
+        }
+    }
+
     private void ShowError(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Error);
+
 
     private void ShowNotice(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Info);
 

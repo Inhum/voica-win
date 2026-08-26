@@ -51,6 +51,13 @@ public static class S
     public static string NoticeCaptureLost => Loc.T(
         "The microphone stopped sending audio — transcribing what was recorded.",
         "Микрофон перестал отдавать звук — распознаю то, что успело записаться.");
+    // Local engine chosen without its model (spec §2.5). The cloud is never used instead, so the
+    // message has to name what is missing and lead straight to where it is fixed.
+    public static string ErrModelMissing => Loc.T(
+        "The local engine is selected, but its model is not installed. Download the GigaAM local model — or switch recognition back to the cloud."
+        + "\n\nOpen Settings?",
+        "Выбран локальный движок, но его модель не установлена. Скачайте локальную модель GigaAM — или переключите распознавание обратно на облако."
+        + "\n\nОткрыть настройки?");
     public static string ErrNoKey => Loc.T("No Groq API key set. Add it in Settings.", "Ключ Groq не задан. Укажите его в Настройках.");
     public static string ErrRecordingStartFmt => Loc.T("Couldn't start recording: {0}", "Не удалось начать запись: {0}");
     public static string ErrRecordingFailedFmt => Loc.T("Recording failed: {0}", "Ошибка записи: {0}");

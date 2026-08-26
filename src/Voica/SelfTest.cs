@@ -107,6 +107,16 @@ public static class SelfTest
             && !LayoutSwitch.CollidesWithLayoutSwitch(
                 new HotkeyBinding { Ctrl = true, Shift = true, MainVk = HotkeyBinding.VK_SPACE }));
 
+        // --- Local engine without its model (spec §2.5) ---
+        // The cloud must never stand in for a chosen local engine, not even "while the model
+        // downloads": a live macOS check found dictations going to Groq with the switch reading
+        // offline. The condition is pinned here so the old `&& IsInstalled()` fallback cannot
+        // creep back as a convenience.
+        Check("a chosen local engine without a model refuses rather than using the cloud",
+            DictationController.MustRefuse(EngineKind.Local, modelInstalled: false)
+            && !DictationController.MustRefuse(EngineKind.Local, modelInstalled: true)
+            && !DictationController.MustRefuse(EngineKind.Cloud, modelInstalled: false));
+
         // --- Filler removal (spec §6.3) ---
         // Every caveat below is a line of live text that broke. Unit tests alone did not catch
         // them: the run over the whole history did.

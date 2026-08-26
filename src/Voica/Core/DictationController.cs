@@ -27,6 +27,12 @@ public sealed class DictationController : IDisposable
     public event Action<string>? Notice;
     /// <summary>Raised with recognized text when the output mode is Window.</summary>
     public event Action<string>? ResultReady;
+    /// <summary>
+    /// Raised when the local engine is selected but its model is not installed (spec §2.5). The
+    /// cloud is NOT used instead — "Local (offline)" is a promise about privacy, and breaking it
+    /// quietly is worse than refusing.
+    /// </summary>
+    public event Action? ModelMissing;
 
     public DictationController(Dispatcher dispatcher)
     {
@@ -112,8 +118,29 @@ public sealed class DictationController : IDisposable
         }));
     }
 
+    /// <summary>
+    /// Whether a dictation must be refused outright (spec §2.5): the local engine is chosen and its
+    /// model is not installed. The cloud is NOT an acceptable substitute — "Local (offline)" is a
+    /// promise about privacy, and pressing "Download model" is not consent to send a voice out.
+    /// A live macOS check found the opposite behaviour shipping: after the model was deleted the
+    /// dictation went to Groq and the history recorded `whisper-large-v3`, while the switch still
+    /// read offline.
+    /// </summary>
+    public static bool MustRefuse(EngineKind engine, bool modelInstalled) =>
+        engine == EngineKind.Local && !modelInstalled;
+
     private void BeginRecording()
     {
+        // Say it BEFORE the dictation, not after (spec §2.5): telling someone their model is
+        // missing once they have spoken for two minutes wastes the two minutes — there is nothing
+        // to transcribe that recording with.
+        if (MustRefuse(Prefs.Engine, ModelManager.IsInstalled()))
+        {
+            Log.Error("local engine is selected but its model is not installed");
+            ModelMissing?.Invoke();
+            return;
+        }
+
         try
         {
             _recorder.Start();
@@ -155,9 +182,19 @@ public sealed class DictationController : IDisposable
 
         Log.Info($"recording stopped: {recording.DurationSeconds:0.00}s, file {Path.GetFileName(recording.FilePath)}");
 
-        // Engine selection (spec §2.5): local only when chosen AND installed — while the model
-        // is not (yet) downloaded, the cloud keeps working.
-        bool useLocal = Prefs.Engine == EngineKind.Local && ModelManager.IsInstalled();
+        // Engine selection (spec §2.5). A chosen local engine is never served by the cloud, not
+        // even "while the model downloads": pressing "Download model" is not consent to send your
+        // voice out. The check is repeated here because the model can be deleted mid-recording —
+        // the one at the start of the dictation is the one the user actually sees.
+        bool useLocal = Prefs.Engine == EngineKind.Local;
+        if (MustRefuse(Prefs.Engine, ModelManager.IsInstalled()))
+        {
+            TryDelete(recording.FilePath);
+            SetState(DictationState.Idle);
+            Log.Error("local model disappeared during the recording — refusing to fall back to the cloud");
+            ModelMissing?.Invoke();
+            return;
+        }
 
         var key = KeyStore.Load();
         if (!useLocal && key is null)

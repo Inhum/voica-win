@@ -82,9 +82,10 @@ public partial class SettingsWindow : Window
         if (!_loaded) return;
         Prefs.Engine = EngineCombo.SelectedIndex == 1 ? EngineKind.Local : EngineKind.Cloud;
 
-        // Spec §2.5: the model downloads on demand when the local engine is first enabled.
-        if (Prefs.Engine == EngineKind.Local && !ModelManager.IsInstalled() && _downloadCts is null)
-            _ = DownloadModelAsync();
+        // Choosing the local engine must NOT start a download by itself (spec §9.5): behind a
+        // proxy that wants credentials it is an instant 407 nobody asked for and nobody understands.
+        // The Download button appears right here instead, and the download starts when it is
+        // pressed.
         RefreshModelStatus();
         RefreshNoKeyHint();   // the way out of "no key" depends on which engine is selected (§11.3)
     }
