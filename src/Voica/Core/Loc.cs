@@ -71,6 +71,13 @@ public static class S
         "Не удалось пройти через прокси {0} — он требует авторизации либо не отвечает.");
     public static string NetTimeout => Loc.T("The request timed out.", "Запрос не ответил вовремя.");
     public static string ErrNoKey => Loc.T("No Groq API key set. Add it in Settings.", "Ключ Groq не задан. Укажите его в Настройках.");
+    // Shown at the START of a dictation, like the missing model (§2.5): naming what is missing and
+    // leading to where it is fixed, before anything has been said.
+    public static string ErrNoKeyAsk => Loc.T(
+        "The cloud engine is selected, but no Groq API key is set — there is nothing to transcribe with. Add your key — or switch recognition to the local engine, which needs no key."
+        + "\n\nOpen Settings?",
+        "Выбрано облако, но ключ Groq не задан — распознавать нечем. Укажите ключ — или переключите распознавание на локальный движок, которому ключ не нужен."
+        + "\n\nОткрыть настройки?");
     public static string ErrRecordingStartFmt => Loc.T("Couldn't start recording: {0}", "Не удалось начать запись: {0}");
     public static string ErrRecordingFailedFmt => Loc.T("Recording failed: {0}", "Ошибка записи: {0}");
     public static string ErrHotkeyFmt => Loc.T("Couldn't register the global hotkey: {0}", "Не удалось зарегистрировать хоткей: {0}");
@@ -113,6 +120,7 @@ public static class S
     public static string ModelDownloadingFmt => Loc.T("Downloading model… {0}%", "Скачиваю модель… {0}%");
     public static string ModelDownloadFailedFmt => Loc.T("Model download failed: {0}", "Не удалось скачать модель: {0}");
     public static string BtnDownloadModel => Loc.T("Download", "Скачать");
+    public static string BtnCancelDownload => Loc.T("Cancel", "Отмена");
     public static string BtnDeleteModel => Loc.T("Delete model", "Удалить модель");
     public static string LocalPreparing => Loc.T("Preparing the local model…", "Готовлю локальную модель…");
     public static string NoticeOfflineFallback => Loc.T(
@@ -157,6 +165,14 @@ public static class S
         "Voica бесплатна и останется бесплатной — все функции, без подписки. Донат — по желанию.");
     public static string AboutLicense => "© 2026 Ivan Ushakov · MIT License";
     public static string ModelDiskFmt => Loc.T("On disk: {0} MB.", "На диске: {0} МБ.");
+    // Deleting the model is one click away from a 214 MB re-download, which in the network this
+    // was built for (§9.5) is not a small thing to ask again. macOS confirms it too.
+    public static string ModelDeleteTitle => Loc.T("Delete the local model?", "Удалить локальную модель?");
+    public static string ModelDeleteAskFmt => Loc.T(
+        "This frees {0} MB. You can download it again at any time."
+        + "\n\nWhile it is missing the local engine has nothing to transcribe with, so dictation will refuse until you download it again or switch recognition to the cloud.",
+        "Освободится {0} МБ. Скачать её снова можно в любой момент."
+        + "\n\nПока модели нет, локальному движку распознавать нечем: диктовка будет отказывать, пока модель не скачана заново или распознавание не переключено на облако.");
     public static string LblDictationMode => Loc.T("Dictation mode", "Режим диктовки");
     public static string ModePtt => Loc.T("Push-to-talk (hold)", "Push-to-talk (удержание)");
     public static string ModeToggle => Loc.T("Toggle (press to start / stop)", "Toggle (нажать — старт/стоп)");
@@ -280,6 +296,11 @@ public static class S
     public static string KeyEnterSave => Loc.T("Enter a key to save.", "Введите ключ для сохранения.");
     public static string KeySavedNow => Loc.T("Key saved (encrypted with DPAPI).", "Ключ сохранён (шифрование DPAPI).");
     public static string AllDeleted => Loc.T("All data deleted. Settings reset to defaults.", "Все данные удалены. Настройки сброшены.");
+    // The saved key is gone, but the development fallback (§9) can still supply one, and a filled
+    // key field right after "everything is deleted" reads as a deletion that did not happen.
+    public static string AllDeletedEnvKey => Loc.T(
+        "The stored key was deleted, but GROQ_API_KEY is still set in your environment and is being used. Voica does not change Windows environment variables — clear it there if you want it gone.",
+        "Сохранённый ключ удалён, но в вашем окружении задана переменная GROQ_API_KEY, и используется она. Переменные окружения Windows Voica не меняет — уберите её там, если она не нужна.");
 
     // History window
     public static string HistoryTitle => Loc.T("Voica — History", "Voica — История");

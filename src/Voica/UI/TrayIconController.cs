@@ -58,6 +58,7 @@ public sealed class TrayIconController : IDisposable
         _controller.Notice += ShowNotice;
         _controller.ResultReady += ShowResultWindow;
         _controller.ModelMissing += ShowModelMissing;
+        _controller.KeyMissing += ShowKeyMissing;
 
         try
         {
@@ -169,6 +170,17 @@ public sealed class TrayIconController : IDisposable
     {
         if (ShowOnce(S.ErrModelMissing, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
             OpenSettings(0);   // General: engine + download
+    }
+
+    /// <summary>
+    /// The cloud engine is selected without a key (spec §9). Same treatment as the missing model
+    /// and for the same reason: the dictation did not start, and a balloon would be missed by
+    /// someone who is already talking.
+    /// </summary>
+    private void ShowKeyMissing()
+    {
+        if (ShowOnce(S.ErrNoKeyAsk, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            OpenSettings(0);   // General: the key field
     }
 
     private void ShowError(string message) => _icon?.ShowBalloonTip("Voica", message, BalloonIcon.Error);

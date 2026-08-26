@@ -34,6 +34,9 @@ public sealed class DictationController : IDisposable
     /// </summary>
     public event Action? ModelMissing;
 
+    /// <summary>The cloud engine is chosen and no key is set — raised INSTEAD of starting (spec §9).</summary>
+    public event Action? KeyMissing;
+
     public DictationController(Dispatcher dispatcher)
     {
         _dispatcher = dispatcher;
@@ -129,6 +132,18 @@ public sealed class DictationController : IDisposable
     public static bool MustRefuse(EngineKind engine, bool modelInstalled) =>
         engine == EngineKind.Local && !modelInstalled;
 
+    /// <summary>
+    /// The same refusal for the other engine: the cloud is chosen and there is no key (spec §9).
+    ///
+    /// ⚠️ §2.5 states the rule for the model, but the reason belongs to both: it is about the
+    /// person's time, not about which engine is selected. Without a key the recording is just as
+    /// untranscribable, and finding that out after speaking for five minutes costs the five
+    /// minutes. Reported live on 0.9.0-rc.1 by the owner, who deleted the key and watched the bar
+    /// come up as if everything were fine.
+    /// </summary>
+    public static bool MustRefuseNoKey(EngineKind engine, bool hasKey) =>
+        engine == EngineKind.Cloud && !hasKey;
+
     private void BeginRecording()
     {
         // Say it BEFORE the dictation, not after (spec §2.5): telling someone their model is
@@ -138,6 +153,13 @@ public sealed class DictationController : IDisposable
         {
             Log.Error("local engine is selected but its model is not installed");
             ModelMissing?.Invoke();
+            return;
+        }
+
+        if (MustRefuseNoKey(Prefs.Engine, KeyStore.HasKey))
+        {
+            Log.Error("cloud engine is selected but no Groq key is set");
+            KeyMissing?.Invoke();
             return;
         }
 
@@ -199,10 +221,12 @@ public sealed class DictationController : IDisposable
         var key = KeyStore.Load();
         if (!useLocal && key is null)
         {
+            // Same safety net as the model check above: the key can be deleted while the recording
+            // runs. The refusal the user actually sees is the one at the start.
             TryDelete(recording.FilePath);
             SetState(DictationState.Idle);
             Log.Error("no Groq API key available");
-            RaiseError(S.ErrNoKey);
+            KeyMissing?.Invoke();
             return;
         }
 

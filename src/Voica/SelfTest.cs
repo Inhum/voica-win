@@ -180,6 +180,12 @@ public static class SelfTest
             DictationController.MustRefuse(EngineKind.Local, modelInstalled: false)
             && !DictationController.MustRefuse(EngineKind.Local, modelInstalled: true)
             && !DictationController.MustRefuse(EngineKind.Cloud, modelInstalled: false));
+        // The same rule for the key: refusing AFTER the speech costs the speech. §2.5 writes it
+        // down for the model, but the reason — the person's time — belongs to both engines.
+        Check("the cloud without a key refuses before the recording starts",
+            DictationController.MustRefuseNoKey(EngineKind.Cloud, hasKey: false)
+            && !DictationController.MustRefuseNoKey(EngineKind.Cloud, hasKey: true)
+            && !DictationController.MustRefuseNoKey(EngineKind.Local, hasKey: false));
 
         // --- Filler removal (spec §6.3) ---
         // Every caveat below is a line of live text that broke. Unit tests alone did not catch
