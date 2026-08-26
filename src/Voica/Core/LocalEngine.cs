@@ -288,8 +288,14 @@ public sealed class LocalEngine : IDisposable
         {
             if (_session is null)
             {
-                if (!ModelManager.IsInstalled())
+                // Checked once, then remembered (ModelManager.Verify): a model copied in by hand
+                // has been verified by nobody, and a truncated file otherwise shows up as
+                // gibberish recognition — the most expensive way to learn about it.
+                var state = ModelManager.Verify();
+                if (state == ModelManager.ModelState.Missing)
                     throw new InvalidOperationException("Local model is not installed.");
+                if (state == ModelManager.ModelState.Corrupt)
+                    throw new InvalidOperationException(S.ErrModelCorrupt);
                 PreparingModel?.Invoke();
                 Log.Info("loading local model session…");
                 var started = DateTime.UtcNow;

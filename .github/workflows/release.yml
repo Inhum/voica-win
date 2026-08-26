@@ -3,6 +3,13 @@ name: Release
 # Builds release binaries on GitHub's infrastructure from the pushed tag and attaches them to a
 # GitHub Release. Releases are reproducible from the tagged commit — a prerequisite for code
 # signing via SignPath Foundation (signing step to be added once the application is approved).
+#
+# Release candidates (spec §13): a tag of the form vX.Y.Z-rc.N is published as a PRE-RELEASE, so
+# GitHub keeps it out of /releases/latest and the update check (§10) never offers it to ordinary
+# users. The suffix is stamped into the binary's version — a tester has to be able to say which
+# candidate they are running — but is stripped everywhere else: <Version> in the project, the
+# installer's version fields (Inno needs a numeric one) and the asset names all stay X.Y.Z. Only
+# the release title carries the full tag.
 
 on:
   push:
@@ -23,11 +30,35 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Resolve version from the tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $full = $tag -replace '^v', ''          # 0.8.2-rc.1 — what About must show
+          $base = $full -replace '-.*$', ''       # 0.8.2      — everything else
+          $isRc = $full -ne $base
+
+          # The project's <Version> is the single source of truth (spec §12). Compare it against
+          # the BASE version: comparing the whole tag is what broke the first rc on macOS.
+          $project = ([xml](Get-Content src/Voica/Voica.csproj)).Project.PropertyGroup.Version |
+                     Where-Object { $_ } | Select-Object -First 1
+          if ($project -ne $base) {
+            throw "tag $tag does not match <Version> in Voica.csproj ($project); expected v$project or v$project-rc.N"
+          }
+
+          "full=$full"   >> $env:GITHUB_OUTPUT
+          "base=$base"   >> $env:GITHUB_OUTPUT
+          "isRc=$($isRc.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          Write-Host "tag $tag -> version $full (base $base, pre-release: $isRc)"
+
+      # -p:InformationalVersion is what AppInfo.Version reads, so a candidate says "0.8.2-rc.1" in
+      # About while the assembly version stays numeric (spec §13).
       - name: Publish self-contained (compressed single file)
-        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -o out/self
+        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -p:InformationalVersion=${{ steps.version.outputs.full }} -o out/self
 
       - name: Publish framework-dependent (small, needs .NET 8 Desktop Runtime)
-        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -p:SelfContained=false -o out/fx
+        run: dotnet publish src/Voica/Voica.csproj -c Release -p:PublishSingleFile=true -p:SelfContained=false -p:InformationalVersion=${{ steps.version.outputs.full }} -o out/fx
 
       - name: Self-test both binaries
         shell: pwsh
@@ -50,15 +81,15 @@ jobs:
                   Sort-Object FullName -Descending | Select-Object -First 1
           if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup" }
           Write-Host "compiler: $($iscc.FullName)"
-          $version = "${{ github.ref_name }}" -replace '^v', ''
-          & $iscc.FullName /DAppVersion=$version installer\voica.iss
+          # The base version, not the tag: VersionInfoVersion only accepts numbers (spec §13).
+          & $iscc.FullName /DAppVersion=${{ steps.version.outputs.base }} installer\voica.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Stage assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force out/assets | Out-Null
-          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $version = "${{ steps.version.outputs.base }}"
           Copy-Item out/self/Voica.exe out/assets/Voica.exe
           Copy-Item out/fx/Voica.exe out/assets/Voica-fx.exe
           Copy-Item "out/installer/Voica-Setup-$version.exe" out/assets/
@@ -75,12 +106,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $version = $tag -replace '^v', ''
-          $notes = ".github/release-notes/$tag.md"
+          $version = "${{ steps.version.outputs.base }}"
+          # Notes for the candidate if they exist, otherwise the ones for the release it is aiming
+          # at: rc.1 and the final describe the same change.
+          $notes = @(".github/release-notes/$tag.md", ".github/release-notes/v$version.md") |
+                   Where-Object { Test-Path $_ } | Select-Object -First 1
           $cliArgs = @("release", "create", $tag,
                        "out/assets/Voica-Setup-$version.exe",
                        "out/assets/Voica.exe", "out/assets/Voica-fx.exe",
                        "--title", "Voica $tag")
-          if (Test-Path $notes) { $cliArgs += @("--notes-file", $notes) }
+          if ($notes) { $cliArgs += @("--notes-file", $notes) }
           else { $cliArgs += "--generate-notes" }
+          # A candidate must never become /releases/latest — that is the whole mechanism that keeps
+          # it away from ordinary users (spec §13).
+          if ("${{ steps.version.outputs.isRc }}" -eq "true") { $cliArgs += "--prerelease" }
           gh @cliArgs

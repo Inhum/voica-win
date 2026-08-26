@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Threading;
@@ -118,6 +120,7 @@ public static class ModelManager
             progress?.Report((double)doneBase / total);
         }
 
+        MarkVerified();
         Log.Info("local model downloaded and verified");
     }
 
@@ -135,6 +138,104 @@ public static class ModelManager
         {
             Log.Error("model delete failed", ex);
         }
+    }
+
+    /// <summary>Outcome of checking the installed model against its published checksums.</summary>
+    public enum ModelState { Ok, Missing, Corrupt }
+
+    /// <summary>The record of a passed check, so 215 MB are not re-hashed on every dictation.</summary>
+    private static string MarkerPath => PathFor("verified.json");
+
+    /// <summary>One file as it was when the checksums last passed: name, size, modification time.</summary>
+    public sealed record VerifiedFile(string Name, long Size, long Modified);
+
+    /// <summary>
+    /// Checks the installed model against the checksums published with it, and remembers the
+    /// answer (spec §2.5 + the manual-install path in the README).
+    ///
+    /// Two reasons this exists. A model that arrived by hand — copied in on a USB stick, because
+    /// the network will not let 215 MB through — has never been verified by anything; a truncated
+    /// copy otherwise surfaces as gibberish recognition, which is the worst way to find out.
+    /// And ⚠️ the answer has to be remembered: hashing 215 MB before every dictation would add a
+    /// second of silence to each one. The marker records size and modification time, so touching
+    /// any of the files sends them back through the hash.
+    /// </summary>
+    public static ModelState Verify()
+    {
+        if (!IsInstalled()) return ModelState.Missing;
+        if (MarkerMatches()) return ModelState.Ok;
+
+        foreach (var f in Files)
+        {
+            var actual = ComputeSha256(PathFor(f.FileName));
+            if (!actual.Equals(f.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Error($"model file {f.FileName} fails its checksum (got {actual})", null);
+                return ModelState.Corrupt;
+            }
+        }
+
+        MarkVerified();
+        Log.Info("local model verified against its checksums");
+        return ModelState.Ok;
+    }
+
+    /// <summary>
+    /// Records that the files on disk have been checked. Called after a download too: those parts
+    /// were hashed on the way in, and re-hashing them at first use would be pure waiting.
+    /// </summary>
+    public static void MarkVerified()
+    {
+        try
+        {
+            File.WriteAllText(MarkerPath, JsonSerializer.Serialize(OnDisk()));
+        }
+        catch (Exception ex)
+        {
+            // Not fatal: without the marker the check simply runs again next time.
+            Log.Error("could not write the model verification marker", ex);
+        }
+    }
+
+    private static bool MarkerMatches()
+    {
+        try
+        {
+            if (!File.Exists(MarkerPath)) return false;
+            return MarkerCovers(JsonSerializer.Deserialize<VerifiedFile[]>(File.ReadAllText(MarkerPath)), OnDisk());
+        }
+        catch { return false; }
+    }
+
+    /// <summary>The three files as they are right now.</summary>
+    private static VerifiedFile[] OnDisk() => Files.Select(f =>
+    {
+        var fi = new FileInfo(PathFor(f.FileName));
+        return new VerifiedFile(f.FileName, fi.Exists ? fi.Length : -1, fi.Exists ? fi.LastWriteTimeUtc.Ticks : -1);
+    }).ToArray();
+
+    /// <summary>
+    /// Whether a saved marker still describes the files on disk. Every file has to be named and
+    /// unchanged: a marker that covers two of three files out of the box would let a swapped
+    /// third one through unverified.
+    /// </summary>
+    public static bool MarkerCovers(VerifiedFile[]? saved, VerifiedFile[] actual)
+    {
+        if (saved is null || saved.Length != actual.Length) return false;
+        foreach (var a in actual)
+        {
+            var entry = saved.FirstOrDefault(e => e.Name == a.Name);
+            if (entry is null || entry.Size != a.Size || entry.Modified != a.Modified) return false;
+        }
+        return true;
+    }
+
+    /// <summary>Lowercase hex SHA-256 of a file.</summary>
+    public static string ComputeSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var sha = SHA256.Create();
+        return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
     }
 
     /// <summary>Lowercase hex SHA-256 of a file.</summary>

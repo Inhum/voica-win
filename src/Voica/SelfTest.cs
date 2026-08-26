@@ -32,8 +32,10 @@ public static class SelfTest
         {
 
         // --- AppInfo / version ---
+        // A CI build of a release candidate carries the suffix (spec §13), so the numeric core is
+        // what has to parse — the whole string does not.
         Check("version parses to 3+ components",
-            AppInfo.Version.Split('.').Length >= 3 && AppInfo.Version != "0.0.0");
+            Updater.Core(AppInfo.Version).Split('.').Length >= 3 && AppInfo.Version != "0.0.0");
         Check("repo target is voica-win",
             AppInfo.RepoOwner == "Inhum" && AppInfo.RepoName == "voica-win");
 
@@ -136,6 +138,37 @@ public static class SelfTest
         var proxySnapshot = Prefs.UseSystemProxy;
         Prefs.UseSystemProxy = false;
         Check("the proxy switch persists", !Prefs.UseSystemProxy);
+
+        // The Network tab's line (spec §11.4) has to tell the three routes apart, and the switch
+        // has to actually mean "go direct" — a line that says "system proxy" while the app goes
+        // straight out is the defect macOS shipped and the stub caught.
+        var groq = GroqClient.Endpoint;
+        Check("with the switch off the route reads direct",
+            Net.Resolve(groq) == (Net.ProxySource.Direct, (Uri?)null));
+
+        Prefs.UseSystemProxy = true;
+        var envSnapshot = Environment.GetEnvironmentVariable(Net.ProxyOverrideVariable);
+        Environment.SetEnvironmentVariable(Net.ProxyOverrideVariable, "127.0.0.1:18899");
+        var forced = Net.Resolve(groq);
+        Check("an override is reported as forced, and by its address",
+            forced.Source == Net.ProxySource.Forced
+            && forced.Address?.Host == "127.0.0.1" && forced.Address?.Port == 18899);
+        Environment.SetEnvironmentVariable(Net.ProxyOverrideVariable, envSnapshot);
+
+        // Windows answers "no proxy for this address" by handing back the address itself. Taking
+        // that at face value would name the destination as its own proxy.
+        var defaultProxy = System.Net.WebRequest.DefaultWebProxy;
+        try
+        {
+            System.Net.WebRequest.DefaultWebProxy = new System.Net.WebProxy(
+                new Uri($"http://{groq.Host}:{groq.Port}"));
+            Check("a proxy that is the destination itself means direct",
+                Net.Resolve(groq).Source == Net.ProxySource.Direct);
+        }
+        finally
+        {
+            System.Net.WebRequest.DefaultWebProxy = defaultProxy;
+        }
         Prefs.UseSystemProxy = proxySnapshot;
 
         // --- Local engine without its model (spec §2.5) ---
@@ -536,6 +569,36 @@ public static class SelfTest
         var shaVal = ModelManager.ComputeSha256Async(shaTmp).GetAwaiter().GetResult();
         File.Delete(shaTmp);
         Check("sha-256 helper", shaVal == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        // The remembered result of the checksum run (§2.5 manual install). It has to cover every
+        // file exactly: a marker that quietly ignores one of them is worse than no marker, because
+        // it says "verified" about a file nobody looked at.
+        var markerNow = new[]
+        {
+            new ModelManager.VerifiedFile("a.onnx", 100, 5000),
+            new ModelManager.VerifiedFile("b.yaml", 20, 6000),
+        };
+        Check("a marker matching every file counts as verified",
+            ModelManager.MarkerCovers(markerNow.Reverse().ToArray(), markerNow));
+        Check("a changed size or time sends the files back through the hash",
+            !ModelManager.MarkerCovers(new[]
+            {
+                new ModelManager.VerifiedFile("a.onnx", 101, 5000),
+                new ModelManager.VerifiedFile("b.yaml", 20, 6000),
+            }, markerNow)
+            && !ModelManager.MarkerCovers(new[]
+            {
+                new ModelManager.VerifiedFile("a.onnx", 100, 5000),
+                new ModelManager.VerifiedFile("b.yaml", 20, 6001),
+            }, markerNow));
+        Check("a missing or partial marker is not trusted",
+            !ModelManager.MarkerCovers(null, markerNow)
+            && !ModelManager.MarkerCovers(new[] { markerNow[0] }, markerNow)
+            && !ModelManager.MarkerCovers(new[]
+            {
+                new ModelManager.VerifiedFile("a.onnx", 100, 5000),
+                new ModelManager.VerifiedFile("other.yaml", 20, 6000),
+            }, markerNow));
+
         Check("model files declared", ModelManager.Files.Length == 3 && ModelManager.TotalSize > 200_000_000);
         Check("groq network-error flag",
             new GroqException("x", isNetworkError: true).IsNetworkError && !new GroqException("y").IsNetworkError);
@@ -585,6 +648,37 @@ public static class SelfTest
         Check("update not newer equal", !Updater.IsNewer("0.4.0", "0.4.0"));
         Check("update not newer older", !Updater.IsNewer("0.3.9", "0.4.0"));
         Check("update double-digit", Updater.IsNewer("0.10.0", "0.9.0"));
+
+        // Release candidates (spec §13). The suffix must come off before the dots are counted,
+        // and it decides only when the numbers tie.
+        Check("a candidate's numbers survive the suffix",
+            Updater.Core("v0.8.2-rc.1") == "0.8.2" && Updater.Candidate("v0.8.2-rc.1") == 1
+            && Updater.Candidate("0.8.2") is null);
+        Check("a candidate does not read as an older version",
+            !Updater.IsNewer("0.8.1", "0.8.2-rc.1") && Updater.IsNewer("0.8.2-rc.1", "0.8.1"));
+        Check("the release is newer than its own candidate",
+            Updater.IsNewer("0.8.2", "0.8.2-rc.1") && !Updater.IsNewer("0.8.2-rc.1", "0.8.2"));
+        Check("later candidates win, identical ones do not",
+            Updater.IsNewer("0.8.2-rc.2", "0.8.2-rc.1")
+            && !Updater.IsNewer("0.8.2-rc.1", "0.8.2-rc.2")
+            && !Updater.IsNewer("0.8.2-rc.1", "0.8.2-rc.1"));
+
+        // The daily window belongs to the ATTEMPT, not to its outcome (spec §10): in a closed
+        // network the check fails every launch, and a slot taken only on success means a
+        // twenty-second timeout at every start of every day.
+        var lastCheckSnapshot = Prefs.LastUpdateCheck;
+        var checkOnLaunchSnapshot = Prefs.CheckUpdatesOnLaunch;
+        Prefs.CheckUpdatesOnLaunch = true;
+        Prefs.LastUpdateCheck = null;
+        Check("never checked means check now", Updater.ShouldCheckOnLaunch());
+        Updater.TakeDailySlot();
+        Check("taking the slot closes it for the day", !Updater.ShouldCheckOnLaunch());
+        Prefs.LastUpdateCheck = DateTime.UtcNow - TimeSpan.FromHours(25);
+        Check("the slot reopens after a day", Updater.ShouldCheckOnLaunch());
+        Prefs.CheckUpdatesOnLaunch = false;
+        Check("the launch check obeys its switch", !Updater.ShouldCheckOnLaunch());
+        Prefs.CheckUpdatesOnLaunch = checkOnLaunchSnapshot;
+        Prefs.LastUpdateCheck = lastCheckSnapshot;
 
         // --- Hotkey binding (spec §4) ---
         Check("hotkey default is right alt, bare",
