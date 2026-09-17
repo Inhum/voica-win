@@ -441,13 +441,30 @@ public static class SelfTest
             && !ChatModels.KeyFingerprint("gsk_test_a").Contains("gsk")
             && ChatModels.KeyFingerprint("abc") == "ba7816bf8f01cfea"   // SHA-256("abc"), as on macOS
             && ChatModels.KeyFingerprint(null) == "" && ChatModels.KeyFingerprint("") == "");
+        // A retired model is 404 model_not_found OR 400 model_decommissioned — the second by its
+        // error CODE, never its wording, and a bare 400 is not a retired model (spec §6.1).
+        Check("decommissioned is read from the error code",
+            GroqClient.IsDecommissioned(400,
+                "{\"error\":{\"message\":\"The model `gemma2-9b-it` has been decommissioned and is no longer supported.\",\"type\":\"invalid_request_error\",\"code\":\"model_decommissioned\"}}")
+            && GroqClient.IsDecommissioned(400, "{\"error\":{\"message\":\"reworded any day\",\"code\":\"model_decommissioned\"}}"));
+        Check("decommissioned is never read from the wording",
+            !GroqClient.IsDecommissioned(400, "{\"error\":{\"message\":\"The model has been decommissioned\",\"code\":\"invalid_request\"}}")
+            && !GroqClient.IsDecommissioned(400, "{\"error\":{\"message\":\"The model has been decommissioned\"}}"));
+        Check("a bare or foreign 400 is not a retired model",
+            !GroqClient.IsDecommissioned(400, "")
+            && !GroqClient.IsDecommissioned(400, null)
+            && !GroqClient.IsDecommissioned(400, "not json")
+            && !GroqClient.IsDecommissioned(400, "{\"error\":\"model_decommissioned\"}")
+            && !GroqClient.IsDecommissioned(404, "{\"error\":{\"code\":\"model_decommissioned\"}}"));
         Check("chat choiceRetired detects gone model",
             ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, "llama-3.3-70b-versatile")
             && !ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, ChatModels.Auto));
 
         var savedChat = Prefs.ChatModel; var savedResolved = Prefs.ResolvedChatModel;
-        Prefs.ChatModel = "gemma2-9b-it";
-        Check("prefs chatModel round-trip and active", Prefs.ChatModel == "gemma2-9b-it" && Prefs.ActiveChatModel == "gemma2-9b-it");
+        Prefs.ChatModel = "openai/gpt-oss-20b";
+        Check("prefs chatModel round-trip and active", Prefs.ChatModel == "openai/gpt-oss-20b" && Prefs.ActiveChatModel == "openai/gpt-oss-20b");
+        Prefs.ChatModel = "gemma2-9b-it";   // decommissioned → migrated to auto on read
+        Check("prefs migrates the decommissioned gemma choice", Prefs.ChatModel == ChatModels.Auto);
         Prefs.ChatModel = "qwen/qwen3-32b";   // retired → migrated to auto on read
         Check("prefs migrates retired chat model", Prefs.ChatModel == ChatModels.Auto);
         Prefs.ChatModel = "llama-3.3-70b-versatile";   // withdrawn by Groq 2026-08-16

@@ -269,9 +269,9 @@ public static class GroqClient
                 return text;
             }
         }
-        else if (status == 404)
+        else if (status == RetiredStatus)
         {
-            Log.Info($"chat model {model} returned 404 — re-resolving");   // a stale manual pick goes back to auto
+            Log.Info($"chat model {model} is retired — re-resolving");   // a stale manual pick goes back to auto
         }
         else
         {
@@ -288,7 +288,7 @@ public static class GroqClient
         // Exactly one retry, never a walk down the whole chain inside one dictation: with several
         // refusals in a row the person would wait for each. If the retry fails too, the text goes as
         // it is, and the resolution recomputed from the marks fixes the next dictation.
-        Log.Info($"chat model {model} refused ({status}) — retrying once on {next}");
+        Log.Info($"chat model {model} {(status == 403 ? "refused (403)" : "retired")} — retrying once on {next}");
         var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, next, budget.Token);
         if (retryStatus == 403) Prefs.MarkChatModelBlocked(next, fingerprint);
         if (status == 403) ReportBlocked(model, retryStatus == 403 ? null : next, notify);
@@ -316,6 +316,47 @@ public static class GroqClient
             : string.Format(S.NoticeChatSteppedFmt, model, next));
     }
 
+    /// <summary>
+    /// The status a retired model is reported as. Groq has two answers for one fact — 404
+    /// <c>model_not_found</c> and 400 <c>model_decommissioned</c> (spec §6.1) — so the second is folded
+    /// into the first and the healing code has one case to handle.
+    /// </summary>
+    private const int RetiredStatus = 404;
+
+    /// <summary>
+    /// True when a response says the model has been decommissioned (spec §6.1): 400 with
+    /// <c>error.code == "model_decommissioned"</c>. By the CODE, never the message — the wording is
+    /// the provider's to change any day, the code is the contract. A bare 400 is not a retired
+    /// model: it is just as likely our own malformed request, and re-resolving on it would be wrong.
+    /// </summary>
+    public static bool IsDecommissioned(int status, string? body)
+    {
+        if (status != 400 || string.IsNullOrWhiteSpace(body)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("error", out var error)
+                && error.ValueKind == JsonValueKind.Object
+                && error.TryGetProperty("code", out var code)
+                && code.ValueKind == JsonValueKind.String
+                && code.GetString() == "model_decommissioned";
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The HTTP code of a failed chat response, with a decommissioned model reported as retired.</summary>
+    private static async Task<int> RefusalStatusAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var status = (int)response.StatusCode;
+        if (status != 400) return status;
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return IsDecommissioned(status, body) ? RetiredStatus : status;
+    }
+
     /// <summary>Runs one correction request; Status is the HTTP code, or 0 when we failed open.</summary>
     private static async Task<(string Text, int Status)> TryPostProcessAsync(
         string text, string apiKey, string prompt, string model, CancellationToken budget)
@@ -326,7 +367,7 @@ public static class GroqClient
             using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096, model);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, budget);
             if (!response.IsSuccessStatusCode)
-                return (text, (int)response.StatusCode);
+                return (text, await RefusalStatusAsync(response, budget));
 
             var body = await response.Content.ReadAsStringAsync(budget);
             using var doc = JsonDocument.Parse(body);
@@ -467,12 +508,12 @@ public static class GroqClient
         {
             using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8, model);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            var code = (int)response.StatusCode;
+            var code = response.IsSuccessStatusCode ? (int)response.StatusCode : await RefusalStatusAsync(response, cts.Token);
             return (code, code switch
             {
                 >= 200 and < 300 => null,
                 403 => string.Format(S.LlmBlockedFmt, model),
-                404 => string.Format(S.LlmNotFoundFmt, model),
+                RetiredStatus => string.Format(S.LlmNotFoundFmt, model),
                 401 => S.KeyValidRejected,
                 _ => $"HTTP {code}",
             });

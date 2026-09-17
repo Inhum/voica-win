@@ -239,6 +239,7 @@ public static class Prefs
         "qwen/qwen3-32b",
         "llama-3.3-70b-versatile",   // withdrawn by Groq 2026-08-16
         "qwen/qwen3.6-27b",          // switched off by Groq 2026-09-14 → qwen/qwen3.8-27b
+        "gemma2-9b-it",              // decommissioned: answers 400 model_decommissioned, not 404
     };
 
     /// <summary>Last successfully resolved chat model — used offline and on first run (spec §6.1).</summary>
