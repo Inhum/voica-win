@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-09-17
+
+A full pass over AI term correction's model selection (spec §6.1) against the spec and the macOS app,
+so everything it turned up ships at once.
+
+### Fixed
+- **A withdrawn model that answers `400` now heals like one that answers `404`.** Groq reports some
+  retired models as `400 model_decommissioned` (`gemma2-9b-it`, `mixtral-8x7b-32768`) rather than
+  `404`, so neither self-healing nor the retry ever fired and an old manual pick of such a model left
+  every dictation uncorrected. It is recognised by the error **code**, never the message wording, and a
+  plain `400` is not treated as a retired model. `gemma2-9b-it` joins the retired list.
+- **Settings no longer says "Selected model was unavailable" when nothing was selected.** In
+  "Recommended" mode, any change of the automatically picked model — for example the better model
+  coming back after you enabled it in the Groq console — was reported as if your choice had vanished.
+  That message is now shown only when a model you picked yourself is gone.
+- **A refusal is remembered even if this dictation runs out of time.** Finding the next working model
+  now finishes in the background when the 20-second budget ends first, and a retry that is refused too
+  is handled the same way — so the next dictation starts on a working model instead of paying for the
+  same refusal again.
+- **The last-resort model is the first in alphabetical order**, as the macOS app picks it, rather than
+  whatever order Groq's list happens to come in.
+
 ## [0.9.1] - 2026-09-17
 
 ### Fixed
