@@ -456,6 +456,23 @@ public static class SelfTest
             && !GroqClient.IsDecommissioned(400, "not json")
             && !GroqClient.IsDecommissioned(400, "{\"error\":\"model_decommissioned\"}")
             && !GroqClient.IsDecommissioned(404, "{\"error\":{\"code\":\"model_decommissioned\"}}"));
+        Check("chat resolve fallback is the first id in order, not the API's",
+            ChatModels.Resolve(new[] { "zzz-model", "aaa-model" }, ChatModels.Auto, NoBlocked) == "aaa-model");
+        // Which refusals heal and retry, and when a retry happens at all (spec §6.1; mirrors macOS).
+        Check("refusal: 404 retired, 403 blocked, decommissioned 400 retired",
+            GroqClient.ChatRefusal(404, null) == 404 && GroqClient.ChatRefusal(403, null) == 403
+            && GroqClient.ChatRefusal(400, "{\"error\":{\"code\":\"model_decommissioned\"}}") == 404);
+        Check("refusal: other answers are not healed on",
+            GroqClient.ChatRefusal(400, "{\"error\":{\"code\":\"invalid_value\"}}") is null
+            && GroqClient.ChatRefusal(400, null) is null && GroqClient.ChatRefusal(400, "<html>") is null
+            && GroqClient.ChatRefusal(200, null) is null && GroqClient.ChatRefusal(500, null) is null
+            && GroqClient.ChatRefusal(401, null) is null);
+        Check("retry: once, in auto, onto another model",
+            GroqClient.ShouldRetryChat(true, "a", "b", ChatModels.Auto)
+            && !GroqClient.ShouldRetryChat(false, "a", "b", ChatModels.Auto)
+            && !GroqClient.ShouldRetryChat(true, "a", "b", "a")
+            && !GroqClient.ShouldRetryChat(true, "a", null, ChatModels.Auto)
+            && !GroqClient.ShouldRetryChat(true, "a", "a", ChatModels.Auto));
         Check("chat choiceRetired detects gone model",
             ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, "llama-3.3-70b-versatile")
             && !ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, ChatModels.Auto));

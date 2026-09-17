@@ -251,48 +251,77 @@ public static class GroqClient
         // them. Separate timeouts would let a refusal double what the person waits (spec §6.1).
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(PostProcessTimeout);
-        var fingerprint = ChatModels.KeyFingerprint(apiKey);
 
         var model = Prefs.ActiveChatModel;
         var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, model, budget.Token);
-        if (status == 403)
-        {
-            // /v1/models lists what the platform serves, not what this key may use — a new model
-            // arrives in the org switched OFF. So a 403 is a reason to step down the chain,
-            // exactly like a model disappearing (spec §6.1).
-            Prefs.MarkChatModelBlocked(model, fingerprint);
-            if (Prefs.ChatModel != ChatModels.Auto)
-            {
-                // Retrying on another model would be a substitution, and a manual choice is the
-                // person's own: mark it, say so, leave the text uncorrected (spec §6.1).
-                ReportBlocked(model, null, notify);
-                return text;
-            }
-        }
-        else if (status == RetiredStatus)
-        {
-            Log.Info($"chat model {model} is retired — re-resolving");   // a stale manual pick goes back to auto
-        }
-        else
-        {
-            return result;
-        }
+        if (status != 403 && status != RetiredStatus) return result;
 
-        var next = await ResolveAndCacheChatModelAsync(apiKey, budget.Token);
-        if (next is null || next == model)
-        {
-            if (status == 403) ReportBlocked(model, null, notify);
+        // The healing runs outside the budget: the budget only limits how long THIS dictation waits
+        // for it. If it runs out mid-way, the text goes as it is and the resolution still gets fixed
+        // for the next dictation (spec §6.1).
+        var healing = HandleRefusalAsync(model, status, apiKey, notify, cancellationToken);
+        var next = await Task.WhenAny(healing, Task.Delay(Timeout.Infinite, budget.Token)) == healing
+            ? await healing
+            : null;
+        if (!ShouldRetryChat(canRetry: true, failed: model, next: next, mode: Prefs.ChatModel))
             return text;
-        }
 
         // Exactly one retry, never a walk down the whole chain inside one dictation: with several
-        // refusals in a row the person would wait for each. If the retry fails too, the text goes as
-        // it is, and the resolution recomputed from the marks fixes the next dictation.
+        // refusals in a row the person would wait for each (spec §6.1).
         Log.Info($"chat model {model} {(status == 403 ? "refused (403)" : "retired")} — retrying once on {next}");
-        var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, next, budget.Token);
-        if (retryStatus == 403) Prefs.MarkChatModelBlocked(next, fingerprint);
-        if (status == 403) ReportBlocked(model, retryStatus == 403 ? null : next, notify);
+        var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, next!, budget.Token);
+        if (retryStatus == 403 || retryStatus == RetiredStatus)
+            _ = HandleRefusalAsync(next!, retryStatus, apiKey, notify, cancellationToken);   // fixes the NEXT dictation
         return retry;
+    }
+
+    /// <summary>
+    /// Whether a refused correction is retried in the same dictation (spec §6.1): exactly once, only
+    /// in "auto", and only on a different model — on a manual choice another model is a substitution.
+    /// Mirrors <c>GroqClient.shouldRetryChat</c> in the macOS app.
+    /// </summary>
+    public static bool ShouldRetryChat(bool canRetry, string failed, string? next, string mode) =>
+        canRetry && mode == ChatModels.Auto && next is not null && next != failed;
+
+    /// <summary>
+    /// Reacts to a refused model (spec §6.1) and returns the model "auto" now resolves to, or null
+    /// when there is nothing to retry on. A 403 marks the model for this key and is reported once per
+    /// model per session, naming the model it stepped down to; a manual choice is marked and reported,
+    /// never replaced. A retired model (404 / 400 model_decommissioned) re-resolves, which also sends a
+    /// stale manual pick back to "auto".
+    /// </summary>
+    private static async Task<string?> HandleRefusalAsync(string model, int status, string apiKey,
+        Action<string>? notify, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (status == 403)
+            {
+                // /v1/models lists what the platform serves, not what this key may use — a new model
+                // arrives in the org switched OFF. So a 403 is a reason to step down the chain,
+                // exactly like a model disappearing.
+                Prefs.MarkChatModelBlocked(model, ChatModels.KeyFingerprint(apiKey));
+                if (Prefs.ChatModel != ChatModels.Auto)
+                {
+                    ReportBlocked(model, null, notify);
+                    return null;
+                }
+            }
+            else
+            {
+                Log.Info($"chat model {model} is retired — re-resolving");
+            }
+
+            var next = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
+            if (Prefs.ChatModel != ChatModels.Auto || next == model) next = null;   // a live manual pick stays
+            if (status == 403) ReportBlocked(model, next, notify);
+            return next;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"chat model healing failed: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>Models already reported as refused — at most one notice per model per session.</summary>
@@ -348,13 +377,26 @@ public static class GroqClient
         }
     }
 
+    /// <summary>
+    /// The refusal a chat response carries (spec §6.1): 403 (not enabled for the org), 404 for a
+    /// retired model — 404 itself or 400 <c>model_decommissioned</c> — or null for anything the app
+    /// does not heal on. Mirrors <c>GroqClient.chatRefusal</c> in the macOS app.
+    /// </summary>
+    public static int? ChatRefusal(int status, string? body) => status switch
+    {
+        403 => 403,
+        404 => RetiredStatus,
+        400 when IsDecommissioned(status, body) => RetiredStatus,
+        _ => null,
+    };
+
     /// <summary>The HTTP code of a failed chat response, with a decommissioned model reported as retired.</summary>
     private static async Task<int> RefusalStatusAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var status = (int)response.StatusCode;
         if (status != 400) return status;
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        return IsDecommissioned(status, body) ? RetiredStatus : status;
+        return ChatRefusal(status, body) ?? status;
     }
 
     /// <summary>Runs one correction request; Status is the HTTP code, or 0 when we failed open.</summary>
@@ -463,12 +505,16 @@ public static class GroqClient
         // the refusal would never be noticed (spec §6.1).
         Prefs.ClearBlockedChatModels();
 
-        var before = Prefs.ActiveChatModel;
         var (available, listError) = await TryListModelsAsync(apiKey, cancellationToken);
         if (available.Count == 0)
             return new ChatModelCheck(false, null, listError ?? S.LlmNoModels, false);
 
+        // "Switched" means one thing: a model the person chose is gone and the choice went back to
+        // auto. "auto" landing on a different model than last time is not that — after a model is
+        // enabled again in the console it would read "Selected model was unavailable" (spec §6.1).
+        var manual = Prefs.ChatModel != ChatModels.Auto;
         var resolved = ResolveAndCache(available, apiKey);
+        var switched = manual && Prefs.ChatModel == ChatModels.Auto;
         if (resolved is null)
             return new ChatModelCheck(false, null, S.LlmNoModels, false);
 
@@ -493,7 +539,7 @@ public static class GroqClient
 
             if (status == 403 && refused is not null)
                 problem = string.Format(S.LlmBlockedFmt, refused);   // nowhere left: name the head
-            return new ChatModelCheck(problem is null, resolved, problem, resolved != before,
+            return new ChatModelCheck(problem is null, resolved, problem, switched,
                 problem is null ? refused : null);
         }
     }

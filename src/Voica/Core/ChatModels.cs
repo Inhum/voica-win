@@ -98,7 +98,9 @@ public static class ChatModels
             if (chat.Contains(candidate))
                 return candidate;
 
-        return chat[0];
+        // The fallback is the first id in ORDINAL order, not the API's order: that is what the denylist
+        // of allam was reasoned about, and it is what macOS picks (it sorts the live list).
+        return chat.OrderBy(id => id, StringComparer.Ordinal).First();
     }
 
     /// <summary>
