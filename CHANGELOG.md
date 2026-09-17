@@ -4,39 +4,6 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.2] - 2026-09-17
-
-A full pass over AI term correction's model selection (spec §6.1) against the spec and the macOS app,
-so everything it turned up ships at once.
-
-### Fixed
-- **A withdrawn model that answers `400` now heals like one that answers `404`.** Groq reports some
-  retired models as `400 model_decommissioned` (`gemma2-9b-it`, `mixtral-8x7b-32768`) rather than
-  `404`, so neither self-healing nor the retry ever fired and an old manual pick of such a model left
-  every dictation uncorrected. It is recognised by the error **code**, never the message wording, and a
-  plain `400` is not treated as a retired model. `gemma2-9b-it` joins the retired list.
-- **Settings no longer says "Selected model was unavailable" when nothing was selected.** In
-  "Recommended" mode, any change of the automatically picked model — for example the better model
-  coming back after you enabled it in the Groq console — was reported as if your choice had vanished.
-  That message is now shown only when a model you picked yourself is gone.
-- **A refusal is remembered even if this dictation runs out of time.** Finding the next working model
-  now finishes in the background when the 20-second budget ends first, and a retry that is refused too
-  is handled the same way — so the next dictation starts on a working model instead of paying for the
-  same refusal again.
-- **The last-resort model is the first in alphabetical order**, as the macOS app picks it, rather than
-  whatever order Groq's list happens to come in.
-
-## [0.9.1] - 2026-09-17
-
-### Fixed
-- **A refused correction model costs one retry, not a walk down the whole chain** (spec §6.1).
-  0.9.0 retried a dictation on the next model after a `403`/`404`, but it kept stepping for as long
-  as refusals came, and every request had its own 20-second timeout — so a few refusals in a row
-  could multiply the wait. Now it is exactly one retry, and both requests share a single fail-open
-  budget. If the retry fails too, the text goes as it is and the next dictation starts on the model
-  the marks already point to. A model you picked yourself is still never swapped, not even for this
-  one dictation.
-
 ## [0.9.0] - 2026-09-17
 
 ### Added
@@ -71,14 +38,26 @@ so everything it turned up ships at once.
   key may use, and new models arrive in an organisation switched **off** — so "Recommended" picked
   `openai/gpt-oss-120b`, got `403` on every dictation and never tried anything else. A `403` now
   steps down the chain, like a model disappearing: the refusal is remembered for that key only
-  (by a SHA-256 fingerprint; the key itself is not stored), the next choice is used straight away,
-  and a notification plus the Settings status name both models and where to fix it
-  (console.groq.com → Settings → Limits). A model you picked yourself is never replaced — you are
-  told instead. Opening Settings forgets the refusals and checks again, so a model enabled later
-  comes back.
+  (by a SHA-256 fingerprint; the key itself is not stored), and a notification plus the Settings
+  status name both models and where to fix it (console.groq.com → Settings → Limits). A model you
+  picked yourself is never replaced — you are told instead. Opening Settings forgets the refusals
+  and checks again, so a model enabled later comes back.
+- **A refused or withdrawn model costs this dictation one retry, not its correction.** On a `403`
+  (in "Recommended" mode) or a withdrawn model the resolution is recomputed and the request retried
+  **once** on the new model, with both requests sharing the one 20-second budget. If time runs out,
+  finding the working model finishes in the background, so the next dictation starts on it.
+- **A withdrawn model is recognised both ways Groq reports it**: `404`, and `400` with the error code
+  `model_decommissioned` (`gemma2-9b-it`, `mixtral-8x7b-32768`). Before, the second kind never healed,
+  and an old manual pick of such a model left every dictation uncorrected. The code is read, never the
+  message wording, and a plain `400` is not taken for a withdrawn model.
+- **Settings no longer says "Selected model was unavailable" when nothing was selected.** In
+  "Recommended" mode any change of the automatic pick — such as the better model returning after you
+  enabled it in the console — was reported as if your choice had vanished.
+- **The last-resort model is the first in alphabetical order**, as on macOS, not whatever order
+  Groq's list comes in.
 - **The second link of the chain is `qwen/qwen3.8-27b`.** Groq switched `qwen/qwen3.6-27b` off on
   2026-09-14; without this, anyone refused `gpt-oss-120b` would have dropped straight to
-  `gpt-oss-20b`. A saved manual choice of 3.6 goes back to "Recommended".
+  `gpt-oss-20b`. A saved manual choice of 3.6 (or of `gemma2-9b-it`) goes back to "Recommended".
 - **A dictation nothing can transcribe is refused before it is spoken.** §2.5 states this for the
   missing model; the reason is the person's time, so it holds for the cloud without a key too — that
   case used to open the recording bar, record for as long as you spoke, and complain at the end.
