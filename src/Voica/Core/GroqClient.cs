@@ -231,8 +231,9 @@ public static class GroqClient
     /// <summary>
     /// Corrects mangled vocabulary terms via the Groq chat model (spec §6.1). Fail-open: on any
     /// error/timeout/non-2xx/empty answer the ORIGINAL text is returned — post-processing never
-    /// blocks dictation. The app heals itself without a release: a 404 (model retired by Groq)
-    /// re-resolves the model and retries, and so does a 403 while the choice is "auto".
+    /// blocks dictation. A refusal heals without a release, and this dictation keeps its
+    /// correction: on a 404 (model retired) or a 403 (model not enabled for the org, "auto" only)
+    /// the resolution is recomputed and the request is retried ONCE on the new model.
     /// </summary>
     /// <param name="notify">
     /// Receives a user-facing message when a model is refused for the org (403), once per model per
@@ -246,47 +247,52 @@ public static class GroqClient
         var prompt = PostProcessPromptText(text, vocabulary);
         if (prompt is null) return text;
 
+        // ONE fail-open budget for the whole correction — both requests and the re-resolve between
+        // them. Separate timeouts would let a refusal double what the person waits (spec §6.1).
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(PostProcessTimeout);
+        var fingerprint = ChatModels.KeyFingerprint(apiKey);
+
         var model = Prefs.ActiveChatModel;
-        string? refused = null;   // the first model this dictation got a 403 on — the one to name
-
-        // Bounded by the chain: each step either marks a model or re-resolves after a 404, so it
-        // ends on its own; the bound only guards against permissions changing under our hands.
-        for (int step = 0; step <= ChatModels.PriorityChain.Length; step++)
+        var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, model, budget.Token);
+        if (status == 403)
         {
-            var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, model, cancellationToken);
-            if (status == 403)
+            // /v1/models lists what the platform serves, not what this key may use — a new model
+            // arrives in the org switched OFF. So a 403 is a reason to step down the chain,
+            // exactly like a model disappearing (spec §6.1).
+            Prefs.MarkChatModelBlocked(model, fingerprint);
+            if (Prefs.ChatModel != ChatModels.Auto)
             {
-                // /v1/models lists what the platform serves, not what this key may use — a new
-                // model arrives in the org switched OFF. So a 403 is a reason to step down the
-                // chain, exactly like a model disappearing (spec §6.1).
-                Prefs.MarkChatModelBlocked(model, ChatModels.KeyFingerprint(apiKey));
-                refused ??= model;
-                if (Prefs.ChatModel != ChatModels.Auto)
-                {
-                    // A manual choice is the person's own: mark it, say so, leave it (spec §6.1).
-                    ReportBlocked(refused, null, notify);
-                    return text;
-                }
-            }
-            else if (status == 404)
-            {
-                Log.Info($"chat model {model} returned 404 — re-resolving");
-            }
-            else
-            {
-                if (refused is not null) ReportBlocked(refused, model, notify);
-                return result;
-            }
-
-            var next = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
-            if (next is null || next == model)
-            {
-                if (refused is not null) ReportBlocked(refused, null, notify);
+                // Retrying on another model would be a substitution, and a manual choice is the
+                // person's own: mark it, say so, leave the text uncorrected (spec §6.1).
+                ReportBlocked(model, null, notify);
                 return text;
             }
-            model = next;
         }
-        return text;
+        else if (status == 404)
+        {
+            Log.Info($"chat model {model} returned 404 — re-resolving");   // a stale manual pick goes back to auto
+        }
+        else
+        {
+            return result;
+        }
+
+        var next = await ResolveAndCacheChatModelAsync(apiKey, budget.Token);
+        if (next is null || next == model)
+        {
+            if (status == 403) ReportBlocked(model, null, notify);
+            return text;
+        }
+
+        // Exactly one retry, never a walk down the whole chain inside one dictation: with several
+        // refusals in a row the person would wait for each. If the retry fails too, the text goes as
+        // it is, and the resolution recomputed from the marks fixes the next dictation.
+        Log.Info($"chat model {model} refused ({status}) — retrying once on {next}");
+        var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, next, budget.Token);
+        if (retryStatus == 403) Prefs.MarkChatModelBlocked(next, fingerprint);
+        if (status == 403) ReportBlocked(model, retryStatus == 403 ? null : next, notify);
+        return retry;
     }
 
     /// <summary>Models already reported as refused — at most one notice per model per session.</summary>
@@ -312,19 +318,17 @@ public static class GroqClient
 
     /// <summary>Runs one correction request; Status is the HTTP code, or 0 when we failed open.</summary>
     private static async Task<(string Text, int Status)> TryPostProcessAsync(
-        string text, string apiKey, string prompt, string model, CancellationToken cancellationToken)
+        string text, string apiKey, string prompt, string model, CancellationToken budget)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(PostProcessTimeout);
-
+        // No timeout of its own: the caller's budget covers the retry as well (spec §6.1).
         try
         {
             using var request = BuildChatRequest(apiKey, prompt, maxCompletionTokens: 4096, model);
-            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cts.Token);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseContentRead, budget);
             if (!response.IsSuccessStatusCode)
                 return (text, (int)response.StatusCode);
 
-            var body = await response.Content.ReadAsStringAsync(cts.Token);
+            var body = await response.Content.ReadAsStringAsync(budget);
             using var doc = JsonDocument.Parse(body);
             if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
                 return (text, 0);
