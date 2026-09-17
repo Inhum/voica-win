@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-09-17
+
+### Fixed
+- **A refused correction model costs one retry, not a walk down the whole chain** (spec §6.1).
+  0.9.0 retried a dictation on the next model after a `403`/`404`, but it kept stepping for as long
+  as refusals came, and every request had its own 20-second timeout — so a few refusals in a row
+  could multiply the wait. Now it is exactly one retry, and both requests share a single fail-open
+  budget. If the retry fails too, the text goes as it is and the next dictation starts on the model
+  the marks already point to. A model you picked yourself is still never swapped, not even for this
+  one dictation.
+
 ## [0.9.0] - 2026-09-17
 
 ### Added
