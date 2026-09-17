@@ -36,6 +36,8 @@ public static class Prefs
         public bool LlmPostProcess { get; set; } = false;        // spec §6.1, opt-in
         public string ChatModel { get; set; } = ChatModels.Auto;         // spec §6.1: "auto" | model id
         public string ResolvedChatModel { get; set; } = ChatModels.Seed; // cached resolution
+        public List<string> BlockedChatModels { get; set; } = new();     // spec §6.1: 403 marks…
+        public string BlockedChatModelsKey { get; set; } = "";           // …for this key fingerprint
         public string Engine { get; set; } = "cloud";            // spec §2.5: "cloud" | "local"
         public bool DoubleTapToStart { get; set; } = true;        // spec §4 (Toggle mode)
         public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
@@ -236,6 +238,7 @@ public static class Prefs
     {
         "qwen/qwen3-32b",
         "llama-3.3-70b-versatile",   // withdrawn by Groq 2026-08-16
+        "qwen/qwen3.6-27b",          // switched off by Groq 2026-09-14 → qwen/qwen3.8-27b
     };
 
     /// <summary>Last successfully resolved chat model — used offline and on first run (spec §6.1).</summary>
@@ -250,6 +253,52 @@ public static class Prefs
             }
         }
         set { lock (Gate) { _data.ResolvedChatModel = value; Save(); } }
+    }
+
+    /// <summary>
+    /// Models the key with this fingerprint got a 403 on (spec §6.1): Groq serves them, the
+    /// organisation has not enabled them. Empty for any other key — marks never cross keys — and
+    /// for no key at all. See <see cref="ChatModels.Resolve"/> for how they are used.
+    /// </summary>
+    public static IReadOnlyCollection<string> BlockedChatModels(string fingerprint)
+    {
+        lock (Gate)
+        {
+            if (fingerprint.Length == 0 || _data.BlockedChatModelsKey != fingerprint) return Array.Empty<string>();
+            return _data.BlockedChatModels?.ToArray() ?? Array.Empty<string>();
+        }
+    }
+
+    /// <summary>Marks a model refused (403) for this key; a mark for another key is replaced.</summary>
+    public static void MarkChatModelBlocked(string model, string fingerprint)
+    {
+        if (fingerprint.Length == 0 || string.IsNullOrWhiteSpace(model)) return;
+        lock (Gate)
+        {
+            if (_data.BlockedChatModelsKey != fingerprint || _data.BlockedChatModels is null)
+            {
+                _data.BlockedChatModels = new List<string>();
+                _data.BlockedChatModelsKey = fingerprint;
+            }
+            if (!_data.BlockedChatModels.Contains(model)) _data.BlockedChatModels.Add(model);
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// Drops every 403 mark (spec §6.1). The check in Settings does this before it probes — a mark
+    /// is not forever, or a model enabled in the console after the refusal would stay shunned
+    /// until the app was reinstalled.
+    /// </summary>
+    public static void ClearBlockedChatModels()
+    {
+        lock (Gate)
+        {
+            if ((_data.BlockedChatModels?.Count ?? 0) == 0 && string.IsNullOrEmpty(_data.BlockedChatModelsKey)) return;
+            _data.BlockedChatModels = new List<string>();
+            _data.BlockedChatModelsKey = "";
+            Save();
+        }
     }
 
     /// <summary>The model actually sent to Groq: an explicit choice, else the cached resolution.</summary>

@@ -380,6 +380,10 @@ public static class SelfTest
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
 
         // --- Dynamic chat-model resolution / self-healing (spec §6.1) ---
+        // ⚠️ Every Resolve passes its 403 marks EXPLICITLY. Reading them from Prefs would pick up the
+        // real marks a live check leaves on this machine, and the test would fail for no fault of
+        // the code.
+        var NoBlocked = Array.Empty<string>();
         Check("chat denylist filters non-chat",
             !ChatModels.IsChatModel("whisper-large-v3") && !ChatModels.IsChatModel("playai-tts")
             && !ChatModels.IsChatModel("meta-llama/llama-guard-4-12b")
@@ -395,25 +399,48 @@ public static class SelfTest
             && ChatModels.IsChatModel("meta-llama/llama-4-scout-17b-16e-instruct")
             && ChatModels.IsChatModel("llama-3.1-8b-instant"));
         Check("chat resolve never falls back to allam",
-            ChatModels.Resolve(new[] { "allam-2-7b", "some-new-model" }, ChatModels.Auto) == "some-new-model"
-            && ChatModels.Resolve(new[] { "allam-2-7b" }, ChatModels.Auto) is null);
+            ChatModels.Resolve(new[] { "allam-2-7b", "some-new-model" }, ChatModels.Auto, NoBlocked) == "some-new-model"
+            && ChatModels.Resolve(new[] { "allam-2-7b" }, ChatModels.Auto, NoBlocked) is null);
         Check("chat chain and seed hold only live models",
             ChatModels.Seed == "openai/gpt-oss-120b"
             && ChatModels.PriorityChain[0] == ChatModels.Seed
             && !ChatModels.PriorityChain.Contains("llama-3.3-70b-versatile")
             && !ChatModels.PriorityChain.Contains("gemma2-9b-it")
+            && !ChatModels.PriorityChain.Contains("qwen/qwen3.6-27b")
+            && ChatModels.PriorityChain[1] == "qwen/qwen3.8-27b"
             && ChatModels.PriorityChain.All(ChatModels.IsChatModel));
         Check("chat resolve prefers priority chain",
-            ChatModels.Resolve(new[] { "llama-3.1-8b-instant", "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, ChatModels.Auto)
+            ChatModels.Resolve(new[] { "llama-3.1-8b-instant", "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, ChatModels.Auto, NoBlocked)
                 == "openai/gpt-oss-120b");
         Check("chat resolve honours explicit choice",
-            ChatModels.Resolve(new[] { "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, "openai/gpt-oss-20b") == "openai/gpt-oss-20b");
+            ChatModels.Resolve(new[] { "openai/gpt-oss-20b", "openai/gpt-oss-120b" }, "openai/gpt-oss-20b", NoBlocked) == "openai/gpt-oss-20b");
         Check("chat resolve drops retired choice",
-            ChatModels.Resolve(new[] { "openai/gpt-oss-20b" }, "qwen/qwen3-32b") == "openai/gpt-oss-20b");
+            ChatModels.Resolve(new[] { "openai/gpt-oss-20b" }, "qwen/qwen3-32b", NoBlocked) == "openai/gpt-oss-20b");
         Check("chat resolve falls back to first live",
-            ChatModels.Resolve(new[] { "some-new-model" }, ChatModels.Auto) == "some-new-model");
+            ChatModels.Resolve(new[] { "some-new-model" }, ChatModels.Auto, NoBlocked) == "some-new-model");
         Check("chat resolve null when nothing usable",
-            ChatModels.Resolve(new[] { "whisper-large-v3", "playai-tts" }, ChatModels.Auto) is null);
+            ChatModels.Resolve(new[] { "whisper-large-v3", "playai-tts" }, ChatModels.Auto, NoBlocked) is null);
+        // 403 step-down (spec §6.1): refused models leave the automatic pick, fallback included.
+        Check("chat resolve skips a refused head",
+            ChatModels.Resolve(new[] { "openai/gpt-oss-120b", "qwen/qwen3.8-27b" }, ChatModels.Auto,
+                new[] { "openai/gpt-oss-120b" }) == "qwen/qwen3.8-27b");
+        Check("chat resolve skips several refused links",
+            ChatModels.Resolve(new[] { "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b" }, ChatModels.Auto,
+                new[] { "openai/gpt-oss-120b", "qwen/qwen3.8-27b" }) == "openai/gpt-oss-20b");
+        Check("chat resolve null when everything is refused",
+            ChatModels.Resolve(new[] { "openai/gpt-oss-120b" }, ChatModels.Auto, new[] { "openai/gpt-oss-120b" }) is null);
+        Check("chat resolve fallback skips refused",
+            ChatModels.Resolve(new[] { "aaa-model", "zzz-model" }, ChatModels.Auto, new[] { "aaa-model" }) == "zzz-model");
+        Check("chat resolve keeps a refused manual choice",
+            ChatModels.Resolve(new[] { "openai/gpt-oss-120b", "qwen/qwen3.8-27b" }, "qwen/qwen3.8-27b",
+                new[] { "qwen/qwen3.8-27b" }) == "qwen/qwen3.8-27b");
+        Check("key fingerprint is short, stable, key-bound and never the key",
+            ChatModels.KeyFingerprint("gsk_test_a") == ChatModels.KeyFingerprint("gsk_test_a")
+            && ChatModels.KeyFingerprint("gsk_test_a") != ChatModels.KeyFingerprint("gsk_test_b")
+            && ChatModels.KeyFingerprint("gsk_test_a").Length == 16
+            && !ChatModels.KeyFingerprint("gsk_test_a").Contains("gsk")
+            && ChatModels.KeyFingerprint("abc") == "ba7816bf8f01cfea"   // SHA-256("abc"), as on macOS
+            && ChatModels.KeyFingerprint(null) == "" && ChatModels.KeyFingerprint("") == "");
         Check("chat choiceRetired detects gone model",
             ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, "llama-3.3-70b-versatile")
             && !ChatModels.ChoiceRetired(new[] { "openai/gpt-oss-20b" }, ChatModels.Auto));
@@ -428,8 +455,31 @@ public static class SelfTest
         Check("prefs migrates the withdrawn llama choice and its cached resolution",
             Prefs.ChatModel == ChatModels.Auto && Prefs.ResolvedChatModel == ChatModels.Seed
             && Prefs.ActiveChatModel == ChatModels.Seed);
+        Prefs.ChatModel = "qwen/qwen3.6-27b";   // switched off by Groq 2026-09-14
+        Prefs.ResolvedChatModel = "qwen/qwen3.6-27b";
+        Check("prefs migrates the switched-off qwen3.6 choice and its cached resolution",
+            Prefs.ChatModel == ChatModels.Auto && Prefs.ResolvedChatModel == ChatModels.Seed);
         Prefs.ChatModel = ChatModels.Auto; Prefs.ResolvedChatModel = "openai/gpt-oss-120b";
         Check("prefs active uses cached resolution", Prefs.ActiveChatModel == "openai/gpt-oss-120b");
+
+        // 403 marks live in settings.json — snapshot them with the rest and restore below.
+        var savedPrefs = Prefs.Snapshot();
+        Prefs.ClearBlockedChatModels();
+        Prefs.MarkChatModelBlocked("openai/gpt-oss-120b", "aaa");
+        Check("blocked mark round-trip",
+            Prefs.BlockedChatModels("aaa").SequenceEqual(new[] { "openai/gpt-oss-120b" }));
+        Check("blocked marks don't cross keys", Prefs.BlockedChatModels("bbb").Count == 0);
+        Prefs.MarkChatModelBlocked("qwen/qwen3.8-27b", "aaa");
+        Prefs.MarkChatModelBlocked("qwen/qwen3.8-27b", "aaa");
+        Check("blocked marks accumulate without duplicates", Prefs.BlockedChatModels("aaa").Count == 2);
+        Prefs.MarkChatModelBlocked("openai/gpt-oss-20b", "bbb");
+        Check("a mark for another key replaces the old key's marks",
+            Prefs.BlockedChatModels("aaa").Count == 0 && Prefs.BlockedChatModels("bbb").Count == 1);
+        Prefs.ClearBlockedChatModels();
+        Check("blocked marks cleared", Prefs.BlockedChatModels("bbb").Count == 0);
+        Prefs.MarkChatModelBlocked("openai/gpt-oss-120b", "");
+        Check("no key → no marks", Prefs.BlockedChatModels("").Count == 0);
+        Prefs.Restore(savedPrefs);
         Prefs.ChatModel = savedChat; Prefs.ResolvedChatModel = savedResolved;
         Check("postprocess prompt null on empty vocab",
             GroqClient.PostProcessPromptText("текст", "  \n ") is null);

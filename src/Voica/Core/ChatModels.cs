@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Voica;
 
@@ -23,7 +25,10 @@ public static class ChatModels
     /// Preference order when resolving automatically (spec §6.1), largest first among what Groq
     /// actually serves. The chain is a consumable, not a constant: it gets revised whenever the
     /// provider retires a model (`gemma2-9b-it` vanished; `llama-3.3-70b-versatile` was withdrawn
-    /// on 2026-08-16, and Groq itself named gpt-oss-120b and qwen3.6-27b as the replacements).
+    /// on 2026-08-16, and Groq itself named gpt-oss-120b and qwen3.6-27b as the replacements;
+    /// qwen3.6-27b was switched off on 2026-09-14 with qwen3.8-27b named as its replacement).
+    /// Self-healing would have survived the switch-off, but the second link would have stayed
+    /// empty — and everyone refused gpt-oss-120b would have dropped straight to 20b.
     /// Free-tier rate limits deliberately do NOT influence the order — one correction request is
     /// a vocabulary plus a single dictation, so even the lowest tier covers hundreds a day, and
     /// correction quality matters more than headroom.
@@ -31,7 +36,7 @@ public static class ChatModels
     public static readonly string[] PriorityChain =
     {
         "openai/gpt-oss-120b",
-        "qwen/qwen3.6-27b",
+        "qwen/qwen3.8-27b",
         "openai/gpt-oss-20b",
         "llama-3.1-8b-instant",
     };
@@ -71,13 +76,23 @@ public static class ChatModels
     /// available; otherwise the first entry of the priority chain that exists; otherwise the first
     /// available model. Null when nothing usable is available.
     /// </summary>
-    public static string? Resolve(IReadOnlyCollection<string> available, string? preferred)
+    /// <param name="blocked">
+    /// Models this key got a 403 on (spec §6.1). They are excluded from the automatic pick —
+    /// fallback included — because <c>/v1/models</c> lists what the platform serves, not what the
+    /// key may use, so "auto" would otherwise return to the refused head of the chain forever. An
+    /// explicit choice is never replaced for being blocked: the person picked it themselves.
+    /// Deliberately required: a default would read the REAL marks on the machine, and a self-test
+    /// run after a live check would then fail for reasons that have nothing to do with the code.
+    /// </param>
+    public static string? Resolve(IReadOnlyCollection<string> available, string? preferred,
+        IReadOnlyCollection<string> blocked)
     {
         var chat = available.Where(IsChatModel).ToList();
-        if (chat.Count == 0) return null;
-
         if (!string.IsNullOrWhiteSpace(preferred) && preferred != Auto && chat.Contains(preferred))
             return preferred;
+
+        chat = chat.Where(id => !blocked.Contains(id)).ToList();
+        if (chat.Count == 0) return null;
 
         foreach (var candidate in PriorityChain)
             if (chat.Contains(candidate))
@@ -93,4 +108,14 @@ public static class ChatModels
     public static bool ChoiceRetired(IReadOnlyCollection<string> available, string? preferred) =>
         !string.IsNullOrWhiteSpace(preferred) && preferred != Auto
         && available.Count > 0 && !available.Contains(preferred);
+
+    /// <summary>
+    /// The key's fingerprint the 403 marks are tied to (spec §6.1): another organisation has its
+    /// own permissions, so one key's refusals must not carry over to the next. The first 8 bytes of
+    /// SHA-256 in hex, as on macOS — the key itself is never written anywhere.
+    /// </summary>
+    public static string KeyFingerprint(string? apiKey) =>
+        string.IsNullOrEmpty(apiKey)
+            ? ""
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)), 0, 8).ToLowerInvariant();
 }

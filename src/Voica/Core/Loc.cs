@@ -272,6 +272,16 @@ public static class S
     public static string LlmNotFoundFmt => Loc.T(
         "Model {0} is unavailable (Groq may have renamed or removed it) — please update the app.",
         "Модель {0} недоступна (Groq мог переименовать или убрать её) — обновите приложение.");
+    // 403 step-down (spec §6.1): both models and the place to fix it, so the better one can come back.
+    public static string LlmSteppedDownFmt => Loc.T(
+        "Model {0} isn't enabled for your organisation — switched to {1}. To get it back, enable it at console.groq.com → Settings → Limits.",
+        "Модель {0} не разрешена в вашей организации — перешли на {1}. Чтобы вернуть её, разрешите в console.groq.com → Settings → Limits.");
+    public static string NoticeChatBlockedFmt => Loc.T(
+        "AI term correction didn't run: the model {0} isn't enabled for your Groq organisation. Enable it at console.groq.com → Settings → Limits.",
+        "ИИ-исправление терминов не сработало: модель {0} не разрешена в вашей организации Groq. Разрешите её: console.groq.com → Settings → Limits.");
+    public static string NoticeChatSteppedFmt => Loc.T(
+        "AI term correction: the model {0} isn't enabled for your Groq organisation — carrying on with {1}. To get the previous one back, enable it at console.groq.com → Settings → Limits.",
+        "ИИ-исправление терминов: модель {0} не разрешена в вашей организации Groq — дальше работаем на {1}. Чтобы вернуть прежнюю, разрешите её: console.groq.com → Settings → Limits.");
 
     // Reset settings (spec §11)
     public static string BtnResetSettings => Loc.T("Reset settings…", "Сбросить настройки…");

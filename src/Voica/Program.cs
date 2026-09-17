@@ -114,7 +114,7 @@ public static class Program
         Console.WriteLine($"key check     : {validation.Message}");
 
         var chat = await GroqClient.CheckChatModelAsync(key);
-        Console.WriteLine($"chat model    : {chat.Problem ?? "ok"}");
+        Console.WriteLine($"chat model    : {chat.Problem ?? (chat.SteppedFrom is null ? $"ok ({chat.Model})" : $"ok ({chat.SteppedFrom} refused → {chat.Model})")}");
 
         try
         {

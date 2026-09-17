@@ -231,13 +231,14 @@ public static class GroqClient
     /// <summary>
     /// Corrects mangled vocabulary terms via the Groq chat model (spec §6.1). Fail-open: on any
     /// error/timeout/non-2xx/empty answer the ORIGINAL text is returned — post-processing never
-    /// blocks dictation. A 404 (model retired by Groq) re-resolves the model and retries once, so
-    /// the app heals itself without a release.
+    /// blocks dictation. The app heals itself without a release: a 404 (model retired by Groq)
+    /// re-resolves the model and retries, and so does a 403 while the choice is "auto".
     /// </summary>
     /// <param name="notify">
-    /// Receives a user-facing message when the model is blocked for the org (403). Unlike a 404,
-    /// this cannot heal itself — the model is alive, the access is missing — so staying silent
-    /// would make correction fail on every dictation with no explanation (spec §6.1).
+    /// Receives a user-facing message when a model is refused for the org (403), once per model per
+    /// session. The step-down is never silent: a 403 is one checkbox in the Groq console away from
+    /// fixed, and without a word the person would stay on a worse model with no hint the better one
+    /// can come back (spec §6.1).
     /// </param>
     public static async Task<string> PostProcessAsync(string text, string apiKey, string? vocabulary,
         Action<string>? notify = null, CancellationToken cancellationToken = default)
@@ -245,31 +246,68 @@ public static class GroqClient
         var prompt = PostProcessPromptText(text, vocabulary);
         if (prompt is null) return text;
 
-        var active = Prefs.ActiveChatModel;
-        var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, active, cancellationToken);
-        if (status == 403) { ReportBlocked(active, notify); return result; }
-        if (status != 404) return result;
+        var model = Prefs.ActiveChatModel;
+        string? refused = null;   // the first model this dictation got a 403 on — the one to name
 
-        // Model gone → refresh the resolution and retry once with whatever is available now.
-        Log.Info("chat model returned 404 — re-resolving");
-        var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
-        if (resolved is null || resolved == active) return text;
+        // Bounded by the chain: each step either marks a model or re-resolves after a 404, so it
+        // ends on its own; the bound only guards against permissions changing under our hands.
+        for (int step = 0; step <= ChatModels.PriorityChain.Length; step++)
+        {
+            var (result, status) = await TryPostProcessAsync(text, apiKey, prompt, model, cancellationToken);
+            if (status == 403)
+            {
+                // /v1/models lists what the platform serves, not what this key may use — a new
+                // model arrives in the org switched OFF. So a 403 is a reason to step down the
+                // chain, exactly like a model disappearing (spec §6.1).
+                Prefs.MarkChatModelBlocked(model, ChatModels.KeyFingerprint(apiKey));
+                refused ??= model;
+                if (Prefs.ChatModel != ChatModels.Auto)
+                {
+                    // A manual choice is the person's own: mark it, say so, leave it (spec §6.1).
+                    ReportBlocked(refused, null, notify);
+                    return text;
+                }
+            }
+            else if (status == 404)
+            {
+                Log.Info($"chat model {model} returned 404 — re-resolving");
+            }
+            else
+            {
+                if (refused is not null) ReportBlocked(refused, model, notify);
+                return result;
+            }
 
-        var (retry, retryStatus) = await TryPostProcessAsync(text, apiKey, prompt, resolved, cancellationToken);
-        if (retryStatus == 403) ReportBlocked(resolved, notify);
-        return retry;
+            var next = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
+            if (next is null || next == model)
+            {
+                if (refused is not null) ReportBlocked(refused, null, notify);
+                return text;
+            }
+            model = next;
+        }
+        return text;
     }
 
-    /// <summary>Models already reported as blocked — at most one notice per model per session.</summary>
+    /// <summary>Models already reported as refused — at most one notice per model per session.</summary>
     private static readonly HashSet<string> BlockedReported = new(StringComparer.OrdinalIgnoreCase);
 
-    private static void ReportBlocked(string model, Action<string>? notify)
+    /// <param name="next">
+    /// The model correction carries on with, or null when there is nowhere to step (manual choice,
+    /// or every candidate refused). The difference matters: in the first case correction still
+    /// works and the person is told how to get the better model back, in the second it does not.
+    /// </param>
+    private static void ReportBlocked(string model, string? next, Action<string>? notify)
     {
         lock (BlockedReported)
             if (!BlockedReported.Add(model)) return;
 
-        Log.Error($"chat model {model} is blocked for this Groq org (403)");
-        notify?.Invoke(string.Format(S.LlmBlockedFmt, model));
+        Log.Error(next is null
+            ? $"chat model {model} is blocked for this Groq org (403)"
+            : $"chat model {model} is blocked for this Groq org (403) — stepped down to {next}");
+        notify?.Invoke(next is null
+            ? string.Format(S.NoticeChatBlockedFmt, model)
+            : string.Format(S.NoticeChatSteppedFmt, model, next));
     }
 
     /// <summary>Runs one correction request; Status is the HTTP code, or 0 when we failed open.</summary>
@@ -338,67 +376,110 @@ public static class GroqClient
 
     /// <summary>
     /// Re-resolves the chat model from the live list and caches it (spec §6.1 self-healing).
-    /// Silently drops an explicit choice that no longer exists. Null when nothing usable is available.
+    /// Silently drops an explicit choice that no longer exists, and skips models this key was
+    /// refused (403). Null when nothing usable is available.
     /// </summary>
     public static async Task<string?> ResolveAndCacheChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
     {
         var available = await ListModelsAsync(apiKey, cancellationToken);
-        if (available.Count == 0) return null;
+        return available.Count == 0 ? null : ResolveAndCache(available, apiKey);
+    }
 
+    private static string? ResolveAndCache(IReadOnlyList<string> available, string apiKey)
+    {
         if (ChatModels.ChoiceRetired(available, Prefs.ChatModel))
         {
             Log.Info($"chosen chat model '{Prefs.ChatModel}' is gone — falling back to auto");
             Prefs.ChatModel = ChatModels.Auto;
         }
 
-        var resolved = ChatModels.Resolve(available, Prefs.ChatModel);
+        var blocked = Prefs.BlockedChatModels(ChatModels.KeyFingerprint(apiKey));
+        var resolved = ChatModels.Resolve(available, Prefs.ChatModel, blocked);
         if (resolved is not null) Prefs.ResolvedChatModel = resolved;
         return resolved;
     }
 
-    /// <summary>Outcome of the chat-model check shown in Settings (spec §6.1 UX).</summary>
-    public sealed record ChatModelCheck(bool Available, string? Model, string? Problem, bool Switched);
+    /// <summary>
+    /// Outcome of the chat-model check shown in Settings (spec §6.1 UX). <c>SteppedFrom</c> is the
+    /// model that answered 403 when the check had to step down to <c>Model</c>.
+    /// </summary>
+    public sealed record ChatModelCheck(bool Available, string? Model, string? Problem, bool Switched,
+        string? SteppedFrom = null);
 
     /// <summary>
     /// Refreshes the model list, re-resolves (self-healing), and probes the resolved model
-    /// (spec §6.1): distinguishes 403 (blocked for the org) from other failures.
+    /// (spec §6.1): distinguishes 403 (blocked for the org) from other failures. In "auto" a 403
+    /// steps down the chain and probes again, so the status names both the refused model and the
+    /// one in use.
     /// </summary>
     public static async Task<ChatModelCheck> CheckChatModelAsync(string apiKey, CancellationToken cancellationToken = default)
     {
+        // The check IS the re-check: a mark is not forever, or a model enabled in the console after
+        // the refusal would never be noticed (spec §6.1).
+        Prefs.ClearBlockedChatModels();
+
         var before = Prefs.ActiveChatModel;
         var (available, listError) = await TryListModelsAsync(apiKey, cancellationToken);
         if (available.Count == 0)
             return new ChatModelCheck(false, null, listError ?? S.LlmNoModels, false);
 
-        var resolved = await ResolveAndCacheChatModelAsync(apiKey, cancellationToken);
+        var resolved = ResolveAndCache(available, apiKey);
         if (resolved is null)
             return new ChatModelCheck(false, null, S.LlmNoModels, false);
 
-        bool switched = resolved != before;
+        var fingerprint = ChatModels.KeyFingerprint(apiKey);
+        string? refused = null;
+        for (int left = ChatModels.PriorityChain.Length; ; left--)
+        {
+            var (status, problem) = await ProbeChatModelAsync(apiKey, resolved, cancellationToken);
+            if (status == 403 && Prefs.ChatModel == ChatModels.Auto && left > 0)
+            {
+                Prefs.MarkChatModelBlocked(resolved, fingerprint);
+                refused ??= resolved;
+                var next = ChatModels.Resolve(available, ChatModels.Auto, Prefs.BlockedChatModels(fingerprint));
+                if (next is not null && next != resolved)
+                {
+                    Log.Info($"chat check: {resolved} refused (403) — trying {next}");
+                    Prefs.ResolvedChatModel = next;
+                    resolved = next;
+                    continue;
+                }
+            }
 
+            if (status == 403 && refused is not null)
+                problem = string.Format(S.LlmBlockedFmt, refused);   // nowhere left: name the head
+            return new ChatModelCheck(problem is null, resolved, problem, resolved != before,
+                problem is null ? refused : null);
+        }
+    }
+
+    /// <summary>One light request to a chat model; Status is the HTTP code, 0 when none came back.</summary>
+    private static async Task<(int Status, string? Problem)> ProbeChatModelAsync(
+        string apiKey, string model, CancellationToken cancellationToken)
+    {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(ChatProbeTimeout);
         try
         {
-            using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8, resolved);
+            using var request = BuildChatRequest(apiKey, "ok", maxCompletionTokens: 8, model);
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            var problem = (int)response.StatusCode switch
+            var code = (int)response.StatusCode;
+            return (code, code switch
             {
                 >= 200 and < 300 => null,
-                403 => string.Format(S.LlmBlockedFmt, resolved),
-                404 => string.Format(S.LlmNotFoundFmt, resolved),
+                403 => string.Format(S.LlmBlockedFmt, model),
+                404 => string.Format(S.LlmNotFoundFmt, model),
                 401 => S.KeyValidRejected,
-                var code => $"HTTP {code}",
-            };
-            return new ChatModelCheck(problem is null, resolved, problem, switched);
+                _ => $"HTTP {code}",
+            });
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new ChatModelCheck(false, resolved, S.KeyValidTimeout, switched);
+            return (0, S.KeyValidTimeout);
         }
         catch (HttpRequestException ex)
         {
-            return new ChatModelCheck(false, resolved, Net.Describe(ex, ChatEndpoint), switched);
+            return (0, Net.Describe(ex, ChatEndpoint));
         }
     }
 

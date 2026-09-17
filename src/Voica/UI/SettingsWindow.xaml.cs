@@ -364,10 +364,12 @@ public partial class SettingsWindow : Window
         var check = await GroqClient.CheckChatModelAsync(key);
         if (check.Available)
         {
-            LlmStatusText.Text = check.Switched
-                ? string.Format(S.LlmSwitchedFmt, check.Model)
-                : string.Format(S.LlmAvailableFmt, check.Model);
-            LlmStatusText.Foreground = check.Switched
+            LlmStatusText.Text = check.SteppedFrom is not null
+                ? string.Format(S.LlmSteppedDownFmt, check.SteppedFrom, check.Model)
+                : check.Switched
+                    ? string.Format(S.LlmSwitchedFmt, check.Model)
+                    : string.Format(S.LlmAvailableFmt, check.Model);
+            LlmStatusText.Foreground = check.SteppedFrom is not null || check.Switched
                 ? System.Windows.Media.Brushes.DarkOrange
                 : System.Windows.Media.Brushes.Green;
         }

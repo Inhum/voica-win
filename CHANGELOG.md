@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **AI term correction no longer gets stuck on a model your Groq organisation hasn't enabled**
+  (spec §6.1, macOS 0.9.19 parity). Groq's model list shows what the platform serves, not what your
+  key may use, and new models arrive in an organisation switched **off** — so "Recommended" picked
+  `openai/gpt-oss-120b`, got `403` on every dictation and never tried anything else. A `403` now
+  steps down the chain, like a model disappearing: the refusal is remembered for that key only
+  (by a SHA-256 fingerprint; the key itself is not stored), the next choice is used straight away,
+  and a notification plus the Settings status name both models and where to fix it
+  (console.groq.com → Settings → Limits). A model you picked yourself is never replaced — you are
+  told instead. Opening Settings forgets the refusals and checks again, so a model enabled later
+  comes back.
+- **The second link of the chain is `qwen/qwen3.8-27b`.** Groq switched `qwen/qwen3.6-27b` off on
+  2026-09-14; without this, anyone refused `gpt-oss-120b` would have dropped straight to
+  `gpt-oss-20b`. A saved manual choice of 3.6 goes back to "Recommended".
+
 ## [0.9.0] - 2026-08-26
 
 ### Added
