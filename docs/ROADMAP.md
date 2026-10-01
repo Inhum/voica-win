@@ -3,7 +3,7 @@
 What's ahead, and what we deliberately decided **not** to do (recorded so the question doesn't get
 reopened from scratch). What already shipped is in [CHANGELOG.md](../CHANGELOG.md).
 
-Current as of **0.6.0** (August 2026). The macOS app (`Inhum/voica`) has its own numbering and its
+Current as of **0.9.0** (September 2026). The macOS app (`Inhum/voica`) has its own numbering and its
 own [ROADMAP](https://github.com/Inhum/voica/blob/main/docs/ROADMAP.md); this file mirrors it for
 the Windows side. Per the parity rule, anything cross-platform lands in
 [CORE-SPEC.md](CORE-SPEC.md) first, then in both implementations.
@@ -13,22 +13,41 @@ the Windows side. Per the parity rule, anything cross-platform lands in
 - **Not code-signed.** SmartScreen shows "Windows protected your PC" on first run → *More info →
   Run anyway*. Documented in the [README](../README.md#why-does-windows-warn-about-this-app),
   together with how to verify the download against the release.
+- **A self-signed certificate — decided against, and this is where the platforms differ.** macOS
+  signs with its own "Voica Self-Signed" cert for one concrete reason: the signature is a stable
+  identity, and macOS ties the Accessibility grant to it, so without it every update would ask the
+  user for permissions again. **Windows has no such tie.** The global hook and `SendInput` need no
+  grant at all, nothing is bound to a publisher identity, and SmartScreen trusts a chain to a
+  trusted root — which a self-signed cert does not have. So signing with one would change the first
+  run from "unknown publisher" to "untrusted publisher": the same click, plus a certificate to keep,
+  back up and rotate. The only way to make it count would be asking users to install our root
+  certificate, which is a far bigger ask than one click and is not something an app should teach
+  people to do.
 - **Releases are built by CI from the pushed tag** ([release.yml](../.github/workflows/release.yml)),
   not from a developer machine, so a release is reproducible from its commit — a prerequisite for
   **SignPath Foundation**, the free certificate program for OSS. Signing gets added once the
-  project is accepted there.
+  project is accepted there. Until then what substitutes for a signature is provenance, not trust
+  in a certificate: the release author is `github-actions[bot]`, and every asset carries a
+  `sha256:` digest the user can check against their download.
 - **Buying a certificate — decided against** (before 1.0 at least): ~$100–400/year for an OV/EV
   cert, or Azure Trusted Signing, which needs a verifiable legal entity. macOS reached the same
   answer for notarization ($99/year plus a developer status unavailable to an RF citizen), so both
   platforms accept the same friction: one extra click on first run.
 - Two artifacts per release stay as they are: self-contained (~80 MB, nothing to install) and
-  framework-dependent (~37 MB, needs .NET 8 Desktop Runtime).
+  framework-dependent (~37 MB, needs .NET 8 Desktop Runtime), plus an Inno Setup installer.
+- **Anything a user can see goes out as a release candidate first** (spec §13, since 0.9.0): the tag
+  `vX.Y.Z-rc.N` is published as a pre-release, which GitHub keeps out of `/releases/latest`, so the
+  update check never offers it to ordinary users while a tester can still say which build they run.
 
 ## Auto-updates
 
 **Checking is done** (Settings → About, spec §10): the app reads GitHub Releases anonymously once
 a day, compares versions, and offers a download button. It never downloads or installs anything
 itself — the release page opens in the browser.
+
+A check that fails in a closed network **stays silent and takes the daily slot** (0.9.0): it would
+otherwise fail at every launch, and retrying helps nobody. A check the user asked for still reports
+its error, and names the proxy when that is what refused.
 
 "Updates itself" would mean **Velopack** (one system covering Windows and macOS) or a
 platform-specific updater. Both want a real signature, so this sits behind the decision above —
@@ -37,13 +56,20 @@ platform-specific updater. Both want a real signature, so this sits behind the d
 ## Cross-platform parity
 
 Two native codebases (Swift/AppKit and C#/WPF) held together by a document, not by shared code.
-As of 0.6.0 the parity matrix at the end of [CORE-SPEC.md](CORE-SPEC.md) has **no open rows on the
-Windows side**; where the platforms differ on purpose the row is marked 🔀.
+As of 0.9.0 the parity matrix at the end of [CORE-SPEC.md](CORE-SPEC.md) again has **no open rows on
+the Windows side**; where the platforms differ on purpose the row is marked 🔀.
 
 Feature sets stay in lockstep, **version numbers do not** — each platform numbers independently and
-each will reach its own "1.0". Twice now the flow has gone Windows → macOS (chunk overlap with seam
-de-duplication; the multi-monitor rule for the dictation bar), which is the parity rule working as
-intended rather than a one-way port.
+each will reach its own "1.0". The flow keeps going both ways, which is the parity rule working as
+intended rather than a one-way port. Windows → macOS so far: chunk overlap with seam de-duplication;
+the multi-monitor rule for the dictation bar; retrying a refused correction inside the same dictation
+(§6.1, macOS 0.9.20); and the discovery that Groq reports a withdrawn model as `400
+model_decommissioned` as well as `404`.
+
+What this costs, recorded after a day of it (2026-09-17): a round trip per finding is expensive,
+because a human carries the briefs between the two repositories. Anything found on one side that
+affects the other's code is fixed in the same pass and reported once, and fixes are released in
+batches rather than one release per fix.
 
 ## Possible features
 
@@ -56,9 +82,14 @@ closed it.
   the text — paragraphs, lists, filler-word cleanup — remains an idea **waiting for demand**.
 - ~~Tabbed Settings~~ — 0.4.0. ~~About as a Settings tab~~ — 0.5.0.
 - ~~STT model and language choice~~ — 0.5.0. ~~History export (Markdown / CSV / JSON)~~ — 0.5.0.
-  **Search over history — still open.**
+  ~~Search over history~~ — 0.7.0 (over the final text and the pre-correction `raw_text`).
 - ~~Local offline engine (GigaAM v3 on ONNX Runtime, int8)~~ — 0.4.0.
 - ~~Dictation bar with cancel, double-tap to start, multi-select in History~~ — 0.6.0.
+- ~~Text rules that need no model: fillers, unpaired quotes, deterministic term fixing, each with its
+  own switch~~ — 0.8.0 (spec §6.2/§6.3/§6.4).
+- ~~Working through an authenticated corporate proxy, with a Network tab and a route line~~ — 0.9.0
+  (spec §9.5/§11.4), verified in a real corporate network. **Installing the local model by hand**
+  is documented and checksum-verified, but has not yet been done by anyone in such a network.
 - **Watch GigaAM Multilingual** (Sber, MIT) as a *cloud* STT option: it beats Whisper on Russian
   WER. It becomes relevant if an API host appears (SaluteSpeech or a third party; a bonus would be
   payment with a Russian card).
@@ -114,4 +145,4 @@ describe is the *straightforward* path on this platform.
 - ~~Signing / notarization — when and on whose money~~ — decided, see above.
 - **Donations instead of a subscription** — [Boosty](https://boosty.to/voica), linked from Settings →
   About and the README. No paid features will appear in the app; everything ships to everyone.
-- **Search over history** and **free-form LLM formatting** — both wait for demand.
+- **Free-form LLM formatting** — waits for demand.
