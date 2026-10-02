@@ -87,6 +87,12 @@ closed it.
 - ~~Dictation bar with cancel, double-tap to start, multi-select in History~~ — 0.6.0.
 - ~~Text rules that need no model: fillers, unpaired quotes, deterministic term fixing, each with its
   own switch~~ — 0.8.0 (spec §6.2/§6.3/§6.4).
+- ~~Leaving the clipboard alone~~ — 0.10.0 (issue #2, spec §5): the clipboard is borrowed for the
+  paste and returned. **Typing the text as keystrokes instead — decided against:** it is the only
+  transport that never touches the clipboard, but it behaves differently in every application
+  (auto-brackets in editors, autocorrect in Word, a line break sends the message in a chat). What
+  the returned clipboard cannot be is the source's own again — Excel pastes values, Word applies its
+  "other programs" rule — and no restorer can change that, so giving the clipboard back is opt-in.
 - ~~Working through an authenticated corporate proxy, with a Network tab and a route line~~ — 0.9.0
   (spec §9.5/§11.4), verified in a real corporate network. **Installing the local model by hand**
   is documented and checksum-verified, but has not yet been done by anyone in such a network.

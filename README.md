@@ -50,8 +50,13 @@ back the work on [Boosty](https://boosty.to/voica): the road to 1.0 for both the
   Voica automatically falls back to the local engine when the model is installed. Trade-off: Latin
   words can come out as a mix of alphabets (`Dпсик` instead of `DeepSeek`) — that is exactly what
   the vocabulary fixes, see below. The recognition hint stays cloud-only.
-- **Auto‑insert** into the focused field (synthesized Ctrl+V), and the text is **always** copied to
-  the clipboard as a fallback. Or show an editable **result window**.
+- **Auto‑insert** into the focused field (synthesized Ctrl+V); by default the text also stays in the
+  clipboard as a fallback. Or show an editable **result window**.
+- **Your clipboard can be left alone.** Turn off *Keep the dictation in the clipboard* (Settings →
+  Dictation) and the clipboard is only borrowed for the paste: half a second later what you had
+  copied — text, links, formatted text, files, images — is back. One limit is Windows', not ours:
+  the program you copied from stops treating the contents as its own, so Excel pastes values
+  instead of formulas and Word pastes by its *Pasting from other programs* setting.
 - **History** (SQLite) — browse, **search** (Ctrl+F — it also looks at what the engine heard before
   the corrections, so you find a dictation by what you said), re‑copy, play the audio, delete (one
   or a whole multi‑selection), and **export** the entire history to Markdown, CSV or JSON.
@@ -180,7 +185,8 @@ On first launch (with no key set) the **Settings** window opens. Paste your Groq
   mode). In PTT mode, hold to talk and release to send.
 - While recording, the bar at the bottom of the screen shows the level: **×** cancels (the
   recording is discarded), **✓** stops and transcribes.
-- The recognized text is inserted into the focused field and copied to the clipboard.
+- The recognized text is inserted into the focused field and (unless you turned that off) copied to
+  the clipboard.
 - Right‑click the tray icon for **Settings**, **History**, **Check for Updates**, and **About**.
 
 With the dictation bar on (the default), the tray icon stays neutral. Turn it off and the icon

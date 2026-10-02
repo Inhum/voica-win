@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - Unreleased
+
+### Added
+- **The clipboard can be left alone** ([#2](https://github.com/Inhum/voica-win/issues/2), spec §5). A
+  dictation is inserted by pasting, so it has always replaced whatever you had copied — the text
+  staying there was the fallback for "there was no field to insert into", and it was paid for on
+  every dictation. A new switch, **Keep the dictation in the clipboard** (Settings → Dictation), is
+  on by default, which is the behaviour so far. Turn it off and the clipboard is only borrowed: what
+  you had copied is saved, the dictation is pasted, and half a second later the previous contents
+  are back (five seconds in a remote-desktop viewer, so the paste has time to travel).
+  - Text, links, formatted text, file lists and images come back byte for byte.
+  - If you copied something new in the meantime, it is left alone.
+  - The dictation is kept out of clipboard history (Win+V) and cloud sync.
+  - What cannot be kept — over 64 MB, contents that take over half a second to read, e-mail
+    attachments, a source application that is not responding — falls back to the old behaviour, and
+    the notification says so. A frozen source used to be able to hang the read for 15 seconds per
+    format; it is now refused in a fraction of a second.
+  - **One limit is not ours:** the program you copied from stops treating the contents as its own.
+    Excel then pastes values instead of formulas; Word pastes by its "Pasting from other programs"
+    setting (choose "Keep Source Formatting" there to keep tables and styles). That is why the
+    switch is opt-in.
+  - In the result-window mode with the switch off, the text is copied only by the window's Copy
+    button.
+- **`--probe-clipboard`** and `scripts/try-clipboard.ps1`: what is on the clipboard right now, what of
+  it can be saved, how long that takes, and whether it comes back identical.
+
 ## [0.9.0] - 2026-09-17
 
 ### Added
