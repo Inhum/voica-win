@@ -123,6 +123,17 @@
 
                     <TextBlock Text="{x:Static l:S.LblOutput}" FontWeight="SemiBold" Margin="0,14,0,4" />
                     <ComboBox x:Name="OutputCombo" Width="260" HorizontalAlignment="Left" SelectionChanged="OnOutputChanged" />
+                    <!-- What the clipboard holds after a dictation (spec §5): it sits with Output
+                         because it is the other half of the same question. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <CheckBox x:Name="KeepClipboardCheck" Content="{x:Static l:S.ChkKeepInClipboard}" VerticalAlignment="Center"
+                                  Checked="OnKeepClipboardChanged" Unchecked="OnKeepClipboardChanged" />
+                        <TextBlock Style="{StaticResource InfoDot}">
+                            <TextBlock.ToolTip>
+                                <ToolTip><TextBlock Text="{x:Static l:S.KeepInClipboardHint}" TextWrapping="Wrap" MaxWidth="360" /></ToolTip>
+                            </TextBlock.ToolTip>
+                        </TextBlock>
+                    </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <CheckBox x:Name="OverlayCheck" Content="{x:Static l:S.ChkOverlay}" VerticalAlignment="Center"

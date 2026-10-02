@@ -6,22 +6,15 @@ using System.Windows;
 namespace Voica;
 
 /// <summary>
-/// Delivers recognized text (spec §5). The text is ALWAYS copied to the clipboard (the fallback,
-/// even in insert mode); in insert mode a Ctrl+V is synthesized into the focused field via SendInput.
+/// Delivers recognized text (spec §5): the text is put on the clipboard and, in insert mode, a
+/// Ctrl+V is synthesized into the focused field via SendInput. Whether the text then STAYS on the
+/// clipboard is the caller's decision — see <see cref="ClipboardKeeper"/>.
 /// Call on the UI (STA) thread.
 /// </summary>
 public static class AutoInsert
 {
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_V = 0x56;
-
-    /// <summary>Copies text to the clipboard, then pastes if the mode is Insert.</summary>
-    public static void Deliver(string text, OutputMode mode)
-    {
-        CopyToClipboard(text);
-        if (mode == OutputMode.Insert)
-            SendCtrlV();
-    }
 
     /// <summary>Sets clipboard text, retrying briefly if another app is holding the clipboard open.</summary>
     public static void CopyToClipboard(string text)

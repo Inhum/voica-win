@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
 
         OutputCombo.ItemsSource = new[] { S.OutputInsert, S.OutputWindow };
         OutputCombo.SelectedIndex = Prefs.Output == OutputMode.Insert ? 0 : 1;
+        KeepClipboardCheck.IsChecked = Prefs.KeepTextInClipboard;
 
         // Cloud STT model / language (spec §2); order matches GroqClient's arrays.
         DoubleTapCheck.IsChecked = Prefs.DoubleTapToStart;
@@ -229,6 +230,12 @@ public partial class SettingsWindow : Window
     {
         if (!_loaded) return;
         Prefs.Output = OutputCombo.SelectedIndex == 0 ? OutputMode.Insert : OutputMode.Window;
+    }
+
+    private void OnKeepClipboardChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded) return;
+        Prefs.KeepTextInClipboard = KeepClipboardCheck.IsChecked == true;
     }
 
     private void OnDoubleTapChanged(object sender, RoutedEventArgs e)

@@ -356,18 +356,32 @@ public sealed class DictationController : IDisposable
 
     private void Deliver(string text)
     {
-        // Text is ALWAYS copied (spec §5), then either pasted or shown.
         var mode = Prefs.Output;
-        AutoInsert.CopyToClipboard(text);
         if (mode == OutputMode.Insert)
         {
+            // The insert IS a paste, so the text goes through the clipboard either way (spec §5).
+            // What differs is what the clipboard holds afterwards: the dictation, or — when the
+            // person asked for that — what they had copied before.
+            string? keptReason = null;
+            bool lent = !Prefs.KeepTextInClipboard && ClipboardKeeper.Lend(text, out keptReason);
+            if (!lent) AutoInsert.CopyToClipboard(text);
+
             AutoInsert.SendCtrlV();
-            Log.Info($"delivered via insert (clipboard + Ctrl+V), {text.Length} chars");
+            if (lent) ClipboardKeeper.GiveBackLater(_dispatcher);
+
+            // Could not keep the previous contents (too big, rendered on demand, virtual files):
+            // the old behaviour is the fallback, and the person is told where their text is.
+            bool fellBack = !Prefs.KeepTextInClipboard && !lent;
+            if (fellBack) Log.Info($"clipboard: previous contents not kept — {keptReason}");
+            Log.Info($"delivered via insert ({(lent ? "clipboard lent" : "clipboard")} + Ctrl+V), {text.Length} chars");
             if (Prefs.NotifyOnInsert)
-                RaiseNotice(S.NoticeInserted);
+                RaiseNotice(lent ? S.NoticeInsertedOnly : fellBack ? S.NoticeInsertedClipboardLost : S.NoticeInserted);
         }
         else
         {
+            // Nothing is pasted here, so nothing needs the clipboard: with the switch off the text
+            // is copied only by the window's own Copy button.
+            if (Prefs.KeepTextInClipboard) AutoInsert.CopyToClipboard(text);
             Log.Info($"delivered via window, {text.Length} chars");
             OnUi(() => ResultReady?.Invoke(text));
         }

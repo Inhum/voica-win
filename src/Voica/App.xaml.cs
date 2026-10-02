@@ -29,6 +29,10 @@ public partial class App : Application
 
         _tray = new TrayIconController();
         _tray.Initialize();
+
+        // Once the tray is up and nobody is waiting: the first dictation should not pay for the
+        // clipboard's owner window (spec §5).
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, new Action(ClipboardKeeper.Warm));
     }
 
     protected override void OnExit(ExitEventArgs e)

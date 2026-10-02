@@ -43,6 +43,7 @@ public static class Prefs
         public string SttModel { get; set; } = GroqClient.DefaultSttModel;   // spec §2
         public string Language { get; set; } = "auto";           // spec §2: "auto" | "ru" | "en"
         public bool NotifyOnInsert { get; set; } = true;         // show the "Inserted" balloon
+        public bool KeepTextInClipboard { get; set; } = true;    // spec §5: off = previous contents come back
         public bool ShowOverlay { get; set; } = true;            // spec §4.2, on by default
 
         // Rules that change words each get their own switch (spec §6.2/§6.3/§6.4): without one, a
@@ -310,6 +311,17 @@ public static class Prefs
             var chosen = ChatModel;
             return chosen == ChatModels.Auto ? ResolvedChatModel : chosen;
         }
+    }
+
+    /// <summary>
+    /// Whether the dictation stays in the clipboard after delivery (spec §5). On is the long-standing
+    /// behaviour — the text is the fallback when there was no field to insert into. Off, the clipboard
+    /// is only borrowed for the paste and the previous contents come back (see <see cref="ClipboardKeeper"/>).
+    /// </summary>
+    public static bool KeepTextInClipboard
+    {
+        get { lock (Gate) return _data.KeepTextInClipboard; }
+        set { lock (Gate) { _data.KeepTextInClipboard = value; Save(); } }
     }
 
     /// <summary>Whether to show the "Inserted" balloon after a successful insert.</summary>

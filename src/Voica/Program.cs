@@ -38,6 +38,22 @@ public static class Program
         // each of them would tell the user. Behind scripts/fake-proxy.ps1 with VOICA_PROXY set,
         // this is the check that every one of them names the proxy; unit tests cannot see it,
         // and on macOS three of the four surfaces were wrong while the tests stayed green.
+        // Clipboard diagnostic (spec §5, kept documented per §12): what is on the clipboard right
+        // now, which of it can be saved, how long that takes — then one full loan and return, with a
+        // byte-for-byte comparison. Copy the thing you doubt (an Excel range, a screenshot, files) and
+        // run it: this is the answer to "will MY clipboard survive a dictation".
+        if (args.Contains("--probe-clipboard", StringComparer.OrdinalIgnoreCase))
+        {
+            AttachConsole(AttachParentProcess);
+            //   --leave-out "A;B"   try a different set of formats that are not put back ("" = none)
+            int leaveOut = Array.FindIndex(args, a => a.Equals("--leave-out", StringComparison.OrdinalIgnoreCase));
+            if (leaveOut >= 0 && leaveOut + 1 < args.Length)
+                ClipboardKeeper.LeftOut = new System.Collections.Generic.HashSet<string>(
+                    args[leaveOut + 1].Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                    StringComparer.OrdinalIgnoreCase);
+            return ProbeClipboard();
+        }
+
         if (args.Contains("--probe-net", StringComparer.OrdinalIgnoreCase))
         {
             AttachConsole(AttachParentProcess);
@@ -194,6 +210,38 @@ public static class Program
         };
 
         return app.Run();
+    }
+
+    private static int ProbeClipboard()
+    {
+        try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+
+        ClipboardKeeper.Warm();   // as the app does at start: the window is not part of what is measured
+        var report = new System.Collections.Generic.List<ClipboardKeeper.FormatInfo>();
+        var deciding = System.Diagnostics.Stopwatch.StartNew();
+        var before = ClipboardKeeper.TryCapture(out var reason, report);
+        deciding.Stop();
+        foreach (var f in report)
+            Console.WriteLine($"  {f.Status,-14} {f.Bytes,12:N0}  {f.Name}");
+        if (before is null)
+        {
+            Console.WriteLine($"cannot be kept: {reason} (decided in {deciding.ElapsedMilliseconds} ms) — a dictation would leave its text in the clipboard");
+            return 1;
+        }
+        Console.WriteLine($"saved {before.Formats} formats, {before.Bytes:N0} bytes; read in {before.Took.TotalMilliseconds:F0} ms"
+            + $" (opening took {before.OpenTook.TotalMilliseconds:F0} ms, not counted)");
+        if (before.Problem is not null)
+            Console.WriteLine($"a dictation would NOT keep it: {before.Problem}");
+
+        var sequence = ClipboardKeeper.SetTemporaryText("Voica clipboard probe");
+        if (sequence == 0) { Console.WriteLine("could not write the clipboard"); return 1; }
+        bool restored = ClipboardKeeper.Restore(before, sequence, out var why);
+        if (!restored) { Console.WriteLine($"not restored: {why}"); return 1; }
+
+        var after = ClipboardKeeper.TryCapture(out var afterReason, new System.Collections.Generic.List<ClipboardKeeper.FormatInfo>());
+        bool same = after is not null && ClipboardKeeper.SameContents(before, after);
+        Console.WriteLine(same ? "lent and returned: identical" : $"lent and returned: DIFFERENT ({afterReason ?? "contents differ"})");
+        return same && before.Problem is null ? 0 : 1;
     }
 
     /// <summary>A second of silence as a WAV file, so the probe can post a real request.</summary>

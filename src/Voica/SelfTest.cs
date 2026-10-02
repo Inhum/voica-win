@@ -376,6 +376,59 @@ public static class SelfTest
             && !HistorySearch.MatchedOnlyInRaw(searchRows[1], "оферту")
             && !HistorySearch.MatchedOnlyInRaw(searchRows[0], ""));
 
+        // --- Lending the clipboard to a dictation (spec §5) ---
+        // What can be saved is decided from the list of formats alone, so it is checked without
+        // touching the real clipboard — the self-test must not disturb what the person has copied.
+        {
+            string? Name(uint f) => f switch
+            {
+                0xC001 => "HTML Format", 0xC002 => "FileGroupDescriptorW", 0xC003 => "FileContents",
+                0xC004 => "DataObject", 0xC005 => "Ole Private Data", 0xC006 => "Rich Text Format",
+                _ => null,
+            };
+            var text = ClipboardKeeper.PlanCapture(new uint[] { 13, 16, 1, 7 }, Name);
+            Check("clipboard: text is saved once, not in its synthesized ANSI copies",
+                text.Possible && text.Capture.SequenceEqual(new uint[] { 13, 16 }));
+            var ansi = ClipboardKeeper.PlanCapture(new uint[] { 1 }, Name);
+            Check("clipboard: ANSI-only text is still saved", ansi.Possible && ansi.Capture.SequenceEqual(new uint[] { 1 }));
+            var image = ClipboardKeeper.PlanCapture(new uint[] { 17, 2, 8 }, Name);
+            Check("clipboard: an image is saved as its first DIB only",
+                image.Possible && image.Capture.SequenceEqual(new uint[] { 17 }));
+            var web = ClipboardKeeper.PlanCapture(new uint[] { 0xC001, 13, 0xC006, 0xC004, 0xC005 }, Name);
+            Check("clipboard: only the live data-object handle is left out, the OLE data is kept",
+                web.Possible && web.Capture.SequenceEqual(new uint[] { 0xC001, 13, 0xC006, 0xC005 }));
+            var attachment = ClipboardKeeper.PlanCapture(new uint[] { 0xC002, 0xC003, 13 }, Name);
+            Check("clipboard: virtual files cannot be kept at all", !attachment.Possible && attachment.Capture.Count == 0);
+            var files = ClipboardKeeper.PlanCapture(new uint[] { 15 }, Name);
+            Check("clipboard: a file list is saved", files.Possible && files.Capture.SequenceEqual(new uint[] { 15 }));
+            var handles = ClipboardKeeper.PlanCapture(new uint[] { 2, 3, 9, 0x82, 0x201, 0x301 }, Name);
+            Check("clipboard: handles that are not memory are never copied", !handles.Possible);
+            var chart = ClipboardKeeper.PlanCapture(new uint[] { 14, 3 }, Name);
+            Check("clipboard: a vector picture is saved as its enhanced metafile only",
+                chart.Possible && chart.Capture.SequenceEqual(new uint[] { 14 }));
+            Check("clipboard: an empty clipboard is returned empty",
+                ClipboardKeeper.PlanCapture(Array.Empty<uint>(), Name) is { Possible: true, Capture.Count: 0 });
+            Check("clipboard: restore delay — default, remote session, override",
+                ClipboardKeeper.RestoreDelay(null, "notepad") == TimeSpan.FromMilliseconds(500)
+                && ClipboardKeeper.RestoreDelay(null, "mstsc") == TimeSpan.FromSeconds(5)
+                && ClipboardKeeper.RestoreDelay(null, null) == TimeSpan.FromMilliseconds(500)
+                && ClipboardKeeper.RestoreDelay("1200", "mstsc") == TimeSpan.FromMilliseconds(1200)
+                && ClipboardKeeper.RestoreDelay("abc", "notepad") == TimeSpan.FromMilliseconds(500)
+                && ClipboardKeeper.RestoreDelay("5", "notepad") == TimeSpan.FromMilliseconds(500));
+            Check("clipboard: markers are recognised by name",
+                ClipboardKeeper.IsMarker("ExcludeClipboardContentFromMonitorProcessing")
+                && ClipboardKeeper.IsMarker("canincludeinclipboardhistory")
+                && !ClipboardKeeper.IsMarker("HTML Format") && !ClipboardKeeper.IsMarker(null));
+            Check("clipboard: a format announced with nothing behind it is not a hole",
+                ClipboardKeeper.IsOptional("EnterpriseDataProtectionId")
+                && !ClipboardKeeper.IsOptional("Rich Text Format") && !ClipboardKeeper.IsOptional(null)
+                && !ClipboardKeeper.IsMarker("EnterpriseDataProtectionId"));
+            var keepSaved = Prefs.KeepTextInClipboard;
+            Prefs.KeepTextInClipboard = !keepSaved;
+            Check("clipboard: the switch persists", Prefs.KeepTextInClipboard == !keepSaved);
+            Prefs.KeepTextInClipboard = keepSaved;
+        }
+
         // --- LLM post-processing prompt (spec §6.1) ---
         Check("chat endpoint host", GroqClient.ChatEndpoint.Host == "api.groq.com");
 

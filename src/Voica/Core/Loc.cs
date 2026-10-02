@@ -47,6 +47,10 @@ public static class S
 
     // Notices / errors (runtime)
     public static string NoticeInserted => Loc.T("Inserted (also copied to clipboard).", "Вставлено (также скопировано в буфер).");
+    public static string NoticeInsertedOnly => Loc.T("Inserted.", "Вставлено.");
+    public static string NoticeInsertedClipboardLost => Loc.T(
+        "Inserted. What was in the clipboard could not be kept — the dictation is there now.",
+        "Вставлено. Прежнее содержимое буфера сохранить не удалось — теперь в нём текст диктовки.");
     public static string NoticeNoSpeech => Loc.T("No speech recognized.", "Речь не распознана.");
     public static string NoticeCaptureLost => Loc.T(
         "The microphone stopped sending audio — transcribing what was recorded.",
@@ -208,6 +212,12 @@ public static class S
     public static string LblOutput => Loc.T("Output", "Вывод");
     public static string OutputInsert => Loc.T("Insert into focused field", "Вставлять в активное поле");
     public static string OutputWindow => Loc.T("Show result window", "Показывать окно результата");
+    public static string ChkKeepInClipboard => Loc.T(
+        "Keep the dictation in the clipboard",
+        "Оставлять текст диктовки в буфере обмена");
+    public static string KeepInClipboardHint => Loc.T(
+        "On (default): after a dictation its text stays in the clipboard, replacing what you had copied — a fallback when there was no field to insert into.\n\nOff: the clipboard is only borrowed for the paste, and about half a second later what you had copied is back — text, links, formatted text, files and images. Very large or unusual contents (over 64 MB, an e-mail attachment, a program that is not responding) are not kept: the dictation stays in the clipboard and the notification says so.\n\nOne thing cannot be returned: the program you copied from stops treating the contents as its own. Excel then pastes values instead of formulas, and Word pastes by its \"Pasting from other programs\" setting — choose \"Keep Source Formatting\" there to keep tables and styles.\n\nAny dictation can always be copied again from History.",
+        "Включено (по умолчанию): после диктовки её текст остаётся в буфере и заменяет то, что вы скопировали раньше — запасной вариант, если вставлять было некуда.\n\nВыключено: буфер занимается только на время вставки, и примерно через полсекунды в нём снова то, что было — текст, ссылки, форматированный текст, файлы, изображения. Очень большое или необычное содержимое (больше 64 МБ, вложение из письма, программа-источник не отвечает) не сохраняется: в буфере остаётся диктовка, и уведомление об этом скажет.\n\nОдно вернуть нельзя: программа, из которой вы копировали, перестаёт считать содержимое своим. Excel после этого вставляет значения вместо формул, а Word вставляет по своей настройке «Вставка из других программ» — выберите там «Сохранить исходное форматирование», чтобы таблицы и стили сохранялись.\n\nЛюбую диктовку всегда можно скопировать заново из истории.");
     public static string ChkStoreAudio => Loc.T("Store audio recordings", "Хранить аудиозаписи");
     public static string ChkNotify => Loc.T("Show a notification after inserting", "Показывать уведомление после вставки");
     public static string ChkCheckUpdates => Loc.T("Check for updates on launch", "Проверять обновления при запуске");

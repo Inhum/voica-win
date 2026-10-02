@@ -75,6 +75,16 @@ window grows *and* shrinks per tab, and a window opened at a tab is sized for th
 frame — are invisible in the XAML and only provable by reading the height back. Pair it with
 `PrintWindow` from PowerShell to shoot a tab (see the window-screenshot notes).
 
+**`--probe-clipboard`** answers "will MY clipboard survive a dictation": it lists what is on the
+clipboard right now, what can be saved and how long that takes, then does one full loan and return and
+compares byte for byte. Clipboard behaviour is the opposite of unit-testable — the self-test must not
+touch what the person has copied, and every surprise so far came from a real application: an owner
+that was not pumping messages made each on-demand format wait 15 s, RichEdit announces a format with
+nothing behind it, Word's own flush is still "another program" to Word. `scripts\try-clipboard.ps1`
+stages text, HTML, RTF, files, images and a frozen owner and runs the probe on each (it OVERWRITES
+the clipboard). ⚠️ From a COM test, `Range.Paste()` ignores Word's default-paste options —
+`CommandBars.ExecuteMso('Paste')` is what Ctrl+V does.
+
 **Rebuild gotcha:** a running `Voica.exe` locks the output exe. Stop it first:
 `Get-Process Voica -ErrorAction SilentlyContinue | Stop-Process -Force`.
 
@@ -102,10 +112,17 @@ Code splits into `Core/` (logic, spec-mapped) and `UI/` (WPF windows + tray):
   because a stray Alt press/release activates the active window's menu bar and steals focus,
   breaking auto-insert. Ctrl/Win are not offered as bare keys for that reason. Must be
   created/disposed on the UI thread (needs a message loop).
-- **[AutoInsert.cs](src/Voica/Core/AutoInsert.cs)** — always sets the clipboard (the spec §5
-  fallback), then `SendInput` Ctrl+V in insert mode. **The native `INPUT` struct must marshal to 40
+- **[AutoInsert.cs](src/Voica/Core/AutoInsert.cs)** — puts the text on the clipboard, then
+  `SendInput` Ctrl+V in insert mode (spec §5). Whether the text STAYS there is the caller's call. **The native `INPUT` struct must marshal to 40
   bytes on x64** (union sized to `MOUSEINPUT`); an undersized struct makes `SendInput` silently
   reject `cbSize` and inject nothing. Guarded by a self-test.
+- **[ClipboardKeeper.cs](src/Voica/Core/ClipboardKeeper.cs)** — lends the clipboard to a dictation
+  and gives it back (spec §5, opt-in via `Prefs.KeepTextInClipboard = false`): copies every readable
+  format out, puts the dictation in for the paste, restores after 0.5 s unless the person copied
+  something new. The rule for what comes back is "what the system itself leaves when the source
+  application closes". Every refusal (over 64 MB, reading over 500 ms, virtual files, an owner that
+  does not answer a ping) falls back to the old behaviour. **Nothing can make the source keep
+  treating the contents as its own** — Excel pastes values, Word applies its "other programs" rule.
 - **[Store.cs](src/Voica/Core/Store.cs)** — SQLite history. All access is serialized through one
   connection + a `lock` (the Windows equivalent of the macOS serial queue, spec §7). Owns the audio
   file lifecycle and honors "store audio" (§8).
