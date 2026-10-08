@@ -48,6 +48,9 @@ public static class S
     // Notices / errors (runtime)
     public static string NoticeInserted => Loc.T("Inserted (also copied to clipboard).", "Вставлено (также скопировано в буфер).");
     public static string NoticeInsertedOnly => Loc.T("Inserted.", "Вставлено.");
+    public static string ErrNativeLibraryMissing => Loc.T(
+        "A file Voica needs was removed from the temporary folder while it was running (a disk clean-up does this). Quit Voica from the tray and start it again — it restores the file at start. This dictation could not be recognized.",
+        "Файл, нужный Voica, был удалён из временной папки, пока программа работала (так делает очистка диска). Закройте Voica через трей и запустите снова — при запуске файл восстановится. Эту диктовку распознать не удалось.");
     public static string NoticeInsertedClipboardLost => Loc.T(
         "Inserted. What was in the clipboard could not be kept — the dictation is there now.",
         "Вставлено. Прежнее содержимое буфера сохранить не удалось — теперь в нём текст диктовки.");

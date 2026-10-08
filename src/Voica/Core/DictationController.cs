@@ -344,9 +344,15 @@ public sealed class DictationController : IDisposable
         {
             Log.Error("transcription failed", ex);
             TryDelete(recording.FilePath);
+            // One of our own native libraries is gone (a temp clean-up got to it before it was
+            // loaded): the raw message names a type initializer and helps nobody, while the cure is
+            // one restart — the runtime unpacks what is missing at start.
+            if (NativeLibs.IsMissingNativeLibrary(ex))
+                RaiseError(S.ErrNativeLibraryMissing);
             // Whatever slipped past GroqClient's own handling still goes through the one
             // translation point (spec §9.5); anything that is not a network failure keeps its text.
-            RaiseError(Net.Describe(ex, GroqClient.Endpoint));
+            else
+                RaiseError(Net.Describe(ex, GroqClient.Endpoint));
         }
         finally
         {

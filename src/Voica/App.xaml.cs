@@ -24,6 +24,10 @@ public partial class App : Application
 
         Paths.EnsureCreated();
 
+        // Before anything else can go missing: hold our unpacked native libraries against a temp
+        // clean-up for the life of the process (see NativeLibs).
+        NativeLibs.Pin();
+
         // Audio retention cleanup on launch (spec §8).
         Retention.RunOnLaunch();
 

@@ -30,6 +30,16 @@ All notable changes to this project are documented here. The format is based on
 - **`--probe-clipboard`** and `scripts/try-clipboard.ps1`: what is on the clipboard right now, what of
   it can be saved, how long that takes, and whether it comes back identical.
 
+### Fixed
+- **The local engine could stop working after Voica had been running for a few days**, with the
+  message "The type initializer for 'Microsoft.ML.OnnxRuntime.NativeMethods' threw an exception" —
+  and the dictation you had just spoken was lost. Voica unpacks its native libraries into the
+  temporary folder at start and loads each one when first needed; a disk clean-up (Windows Storage
+  Sense, on by default on many PCs) deletes the ones not loaded yet, and Windows then offered a
+  3 KB stub of the same name from System32 instead. Voica now holds its unpacked files for as long
+  as it runs, so a clean-up skips them. If one is missing anyway, the message says what happened and
+  that a restart restores it.
+
 ## [0.9.0] - 2026-09-17
 
 ### Added

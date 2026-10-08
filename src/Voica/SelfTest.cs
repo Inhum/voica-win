@@ -376,6 +376,25 @@ public static class SelfTest
             && !HistorySearch.MatchedOnlyInRaw(searchRows[1], "оферту")
             && !HistorySearch.MatchedOnlyInRaw(searchRows[0], ""));
 
+        // --- Our own native libraries must outlive a temp clean-up ---
+        {
+            var dirs = NativeLibs.UnpackDirs(
+                @"C:\Users\u\AppData\Local\Temp\.net\Voica\abc\;C:\Users\u\AppData\Local\Programs\Voica\;C:\WINDOWS\System32;",
+                @"C:\Users\u\AppData\Local\Programs\Voica\", @"C:\WINDOWS");
+            Check("native libs: only the unpack folder is held, not the app folder, never Windows",
+                dirs.SequenceEqual(new[] { @"C:\Users\u\AppData\Local\Temp\.net\Voica\abc" }));
+            Check("native libs: nothing to hold is not an error",
+                NativeLibs.UnpackDirs(null, @"C:\app", @"C:\WINDOWS").Count == 0
+                && NativeLibs.UnpackDirs(@"C:\app\", @"C:\app", @"C:\WINDOWS").Count == 0
+                && NativeLibs.UnpackDirs(@"C:\WindowsApps\x", @"C:\app", @"C:\WINDOWS").Count == 1);
+            Check("native libs: a missing or foreign library is recognised through its wrappers",
+                NativeLibs.IsMissingNativeLibrary(new TypeInitializationException("Microsoft.ML.OnnxRuntime.NativeMethods", new EntryPointNotFoundException()))
+                && NativeLibs.IsMissingNativeLibrary(new DllNotFoundException())
+                && NativeLibs.IsMissingNativeLibrary(new AggregateException(new InvalidOperationException("x", new DllNotFoundException())))
+                && !NativeLibs.IsMissingNativeLibrary(new InvalidOperationException("Local model is not installed."))
+                && !NativeLibs.IsMissingNativeLibrary(null));
+        }
+
         // --- Lending the clipboard to a dictation (spec §5) ---
         // What can be saved is decided from the list of formats alone, so it is checked without
         // touching the real clipboard — the self-test must not disturb what the person has copied.
